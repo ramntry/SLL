@@ -10,9 +10,9 @@ type gdef = {
   gname : ident;
   pattern : pattern;
   gargs : ident list;
-  body : expr;
+  gbody : expr;
 }
-type fdef = { fname : ident; fargs : ident list; body : expr; }
+type fdef = { fname : ident; fargs : ident list; fbody : expr; }
 
 type ftable = (ident, fdef) Hashtbl.t
 type gtable = (ident * ident, gdef) Hashtbl.t
@@ -46,14 +46,14 @@ let make_program fdefs gdefs term =
     Hashtbl.replace gtable (gname, pname) gdef) gdefs;
   { ftable; gtable; term; }
 
-let string_of_fdef { fname; fargs; body; } =
-  string_of_app fname fargs ^ " = " ^ string_of_expr body
+let string_of_fdef { fname; fargs; fbody; } =
+  string_of_app fname fargs ^ " = " ^ string_of_expr fbody
 
 let string_of_pattern { pname; pargs; } = string_of_app pname pargs
 
-let string_of_gdef { gname; pattern; gargs; body; } =
+let string_of_gdef { gname; pattern; gargs; gbody; } =
   string_of_app gname (string_of_pattern pattern :: gargs) ^
-    " = " ^ string_of_expr body
+    " = " ^ string_of_expr gbody
 
 let string_of_program { ftable; gtable; term; } =
   let buffer = Buffer.create 16 in
@@ -75,16 +75,16 @@ let run { ftable; gtable; term; } =
     | Var name -> raise (Interpret_error ("Undefined variable " ^ name))
     | Ctr (cname, cargs) -> Ctr (cname, List.map intr cargs)
     | FCall (fname, act_args) ->
-        let { fname; fargs; body; } = Hashtbl.find ftable fname in
-        body // List.combine fargs act_args |> intr
+        let { fname; fargs; fbody; } = Hashtbl.find ftable fname in
+        intr (fbody // List.combine fargs act_args)
     | GCall (gname, pat :: act_args) ->
         begin match intr pat with
         | Ctr (cname, cargs) ->
-            let { gname; pattern = { pname; pargs }; gargs; body; } =
+            let { gname; pattern = { pname; pargs }; gargs; gbody; } =
               Hashtbl.find gtable (gname, cname)
             in
             let env = List.combine pargs cargs @ List.combine gargs act_args in
-            body // env |> intr
+            intr (gbody // env)
         | _ -> raise (Interpret_error ("FATAL: this code must be unreachable!"))
         end
     | _ -> raise (Interpret_error ("GCall with zero-length argument list"))
@@ -97,20 +97,20 @@ let () =
     gname;
     pattern = { pname = "Z"; pargs = []; };
     gargs = ["y"];
-    body = Var "y";
+    gbody = Var "y";
   } in
   let gAddS = {
     gname;
     pattern = { pname = "S"; pargs = ["x"]; };
     gargs = ["y"];
-    body = Ctr ("S", [
-             GCall (gname, [
-               Var "x"; Var "y"])]);
+    gbody = Ctr ("S", [
+              GCall (gname, [
+                Var "x"; Var "y"])]);
   } in
   let two = make_nat 2 in
   let three = make_nat 3 in
   let term = GCall (gname, [three; two]) in
   let program = make_program [||] [|gAddZ; gAddS|] term in
   let program_text = string_of_program program in
-  let result_text = run program |> string_of_expr in
+  let result_text = string_of_expr (run program) in
   print_endline (program_text ^ " = " ^ result_text)

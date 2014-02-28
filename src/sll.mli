@@ -10,9 +10,9 @@ type gdef = {
   gname : ident;
   pattern : pattern;
   gargs : ident list;
-  body : expr;
+  gbody : expr;
 }
-type fdef = { fname : ident; fargs : ident list; body : expr; }
+type fdef = { fname : ident; fargs : ident list; fbody : expr; }
 
 type ftable = (ident, fdef) Hashtbl.t
 type gtable = (ident * ident, gdef) Hashtbl.t
