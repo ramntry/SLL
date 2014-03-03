@@ -4,7 +4,7 @@ type expr =
   | Var of ident
   | Ctr of ident * expr list
   | FCall of ident * expr list
-  | GCall of ident * expr list
+  | GCall of ident * expr * expr list
 
 type gdef = {
   gname : ident;
@@ -31,14 +31,16 @@ let rec ( // ) expr env =
     end
   | Ctr (name, args) -> Ctr (name, args //* env)
   | FCall (name, args) -> FCall (name, args //* env)
-  | GCall (name, args) -> GCall (name, args //* env)
+  | GCall (name, parg, args) -> GCall (name, parg // env, args //* env)
 
 let string_of_app name args = name ^ "(" ^ String.concat ", " args ^ ")"
 
 let rec string_of_expr = function
   | Var vname -> vname
-  | Ctr (name, args) | FCall (name, args) | GCall (name, args) ->
+  | Ctr (name, args) | FCall (name, args) ->
       string_of_app name (List.map string_of_expr args)
+  | GCall (name, parg, args) ->
+      string_of_app name (List.map string_of_expr (parg :: args))
 
 let make_program fdefs gdefs term =
   let (ftable : ftable) = Hashtbl.create (Array.length fdefs) in
@@ -99,8 +101,8 @@ let run { ftable; gtable; term; } =
           end
         in
         intr (fbody // List.combine fargs act_args)
-    | GCall (gname, pat :: act_args) ->
-        begin match intr pat with
+    | GCall (gname, parg, act_args) ->
+        begin match intr parg with
         | Ctr (cname, cargs) ->
             let { gname; pattern = { pname; pargs }; gargs; gbody; } = begin try
                 Hashtbl.find gtable (gname, cname)
@@ -113,7 +115,6 @@ let run { ftable; gtable; term; } =
             intr (gbody // env)
         | _ -> raise (Interpret_error ("FATAL: this code must be unreachable!"))
         end
-    | _ -> raise (Interpret_error ("GCall with zero-length argument list"))
   in
   intr term
 
@@ -127,12 +128,12 @@ let ( >= ) (fname, fargs) fbody = { fname; fargs; fbody; }
 let () =
   let gdefs = [|
     (* Subtraction for Non-Negative integers *)
-    "snn"  $ ("Z" +> [],    ["y"]) => GCall ("neg", [Var "y"]);
-    "snn"  $ ("S" +> ["x"], ["y"]) => GCall ("sud", [Var "y"; Var "x"]);
+    "snn"  $ ("Z" +> [],    ["y"]) => GCall ("neg", Var "y", []);
+    "snn"  $ ("S" +> ["x"], ["y"]) => GCall ("sud", Var "y", [Var "x"]);
 
     (* Subtract from already Decremented second argument Unexplored first one *)
     "sud"  $ ("Z" +> [],    ["x"]) => Ctr ("S", [Var "x"]);
-    "sud"  $ ("S" +> ["y"], ["x"]) => GCall ("snn", [Var "x"; Var "y"]);
+    "sud"  $ ("S" +> ["y"], ["x"]) => GCall ("snn", Var "x", [Var "y"]);
 
     (* Negate integer *)
     "neg"  $ ("Z" +> [],    []) => Ctr ("Z", []);
@@ -142,27 +143,27 @@ let () =
     (* Addition *)
     "add"  $ ("Z" +> [],    ["y"]) => Var "y";
     "add"  $ ("S" +> ["x"], ["y"]) =>
-      GCall ("aup", [Var "y"; Ctr ("S", [Var "x"])]);
-    "add"  $ ("N" +> ["x"], ["y"]) => GCall ("sup", [Var "y"; Var "x"]);
+      GCall ("aup", Var "y", [Ctr ("S", [Var "x"])]);
+    "add"  $ ("N" +> ["x"], ["y"]) => GCall ("sup", Var "y", [Var "x"]);
 
     (* Add Unexplored integer and Positive one *)
     "aup"  $ ("Z" +> [],    ["y"]) => Var "y";
     "aup"  $ ("S" +> ["x"], ["y"]) =>
-      Ctr ("S", [GCall ("aup", [Var "x"; Var "y"])]);
-    "aup"  $ ("N" +> ["x"], ["y"]) => GCall ("snn", [Var "y"; Var "x"]);
+      Ctr ("S", [GCall ("aup", Var "x", [Var "y"])]);
+    "aup"  $ ("N" +> ["x"], ["y"]) => GCall ("snn", Var "y", [Var "x"]);
 
     (* Subtract from Unexplored integer Positive one *)
     "sup"  $ ("Z" +> [],    ["y"]) => Ctr ("N", [Var "y"]);
-    "sup"  $ ("S" +> ["x"], ["y"]) => GCall ("sud", [Var "y"; Var "x"]);
+    "sup"  $ ("S" +> ["x"], ["y"]) => GCall ("sud", Var "y", [Var "x"]);
     "sup"  $ ("N" +> ["x"], ["y"]) =>
-      Ctr ("N", [GCall ("aup", [Var "y"; Var "x"])]);
+      Ctr ("N", [GCall ("aup", Var "y", [Var "x"])]);
 
     (* Multiplication *)
     "mul"  $ ("Z" +> [],    ["y"]) => Ctr ("Z", []);
     "mul"  $ ("S" +> ["x"], ["y"]) =>
-      GCall ("add", [Var "y"; GCall ("mul", [Var "x"; Var "y"])]);
+      GCall ("add", Var "y", [GCall ("mul", Var "x", [Var "y"])]);
     "mul"  $ ("N" +> ["x"], ["y"]) =>
-      GCall ("neg", [GCall ("mul", [Var "x"; Var "y"])]);
+      GCall ("neg", GCall ("mul", Var "x", [Var "y"]), []);
 
     (* Is Negative predicate *)
     "isn"  $ ("Z" +> [],    []) => Ctr ("F", []);
@@ -185,27 +186,28 @@ let () =
   |] in
   let fdefs = [|
     (* Subtraction *)
-    "sub" >$ ["x"; "y"] >= GCall ("add", [Var "x"; GCall ("neg", [Var "y"])]);
+    "sub" >$ ["x"; "y"] >= GCall ("add", Var "x", [GCall ("neg", Var "y", [])]);
 
     (* Less then predicate *)
-    "lss" >$ ["x"; "y"] >= GCall ("isn", [FCall ("sub", [Var "x"; Var "y"])]);
+    "lss" >$ ["x"; "y"] >= GCall ("isn", FCall ("sub", [Var "x"; Var "y"]), []);
 
     (* Division for Non-Negative integers *)
-    "dnn" >$ ["x"; "y"] >= GCall ("cnd", [
-      FCall ("lss", [Var "x"; Var "y"]);
+    "dnn" >$ ["x"; "y"] >= GCall ("cnd",
+      FCall ("lss", [Var "x"; Var "y"]), [
       Ctr ("Z", []);
       Ctr ("S", [FCall ("dnn", [
         FCall ("sub", [Var "x"; Var "y"]);
         Var "y"])])]);
 
     (* Division *)
-    "div" >$ ["x"; "y"] >= GCall ("mul", [
-      GCall ("mul", [GCall ("sgn", [Var "x"]); GCall ("sgn", [Var "y"])]);
-      FCall ("dnn", [GCall ("abs", [Var "x"]); GCall ("abs", [Var "y"])])]);
+    "div" >$ ["x"; "y"] >= GCall ("mul",
+      GCall ("mul", GCall ("sgn", Var "x", []), [GCall ("sgn", Var "y", [])]), [
+      FCall ("dnn", [
+        GCall ("abs", Var "x", []); GCall ("abs", Var "y", [])])]);
 
     (* signed Modulo *)
     "mod" >$ ["x"; "y"] >= FCall ("sub", [ Var "x";
-      GCall ("mul", [FCall ("div", [Var "x"; Var "y"]); Var "y"])]);
+      GCall ("mul", FCall ("div", [Var "x"; Var "y"]), [Var "y"])]);
   |] in
   let program = make_program fdefs gdefs (Ctr ("Z", [])) in
   print_endline (string_of_program program);
@@ -216,7 +218,7 @@ let () =
     then print_string      " ok"
     else print_endline "\n [FAIL]"
   in
-  let test = tester (fun func x y -> GCall (func, [make_int x; make_int y])) in
+  let test = tester (fun func x y -> GCall (func, make_int x, [make_int y])) in
   test  "snn" ( - )   8    5 ;
   test  "snn" ( - )   5    8 ;
   test  "snn" ( - )   8    0 ;
