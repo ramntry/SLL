@@ -1,23 +1,34 @@
 type ident = string
-type pattern = { pname : ident; pargs : ident list; }
 type expr =
   | Var of ident
   | Ctr of ident * expr list
   | FCall of ident * expr list
   | GCall of ident * expr * expr list
 
-type gdef = {
-  gname : ident;
-  pattern : pattern;
+module IdentMap = Map.Make(String)
+
+type gpdef = {
+  pargs : ident list;
   gargs : ident list;
   gbody : expr;
 }
-type fdef = { fname : ident; fargs : ident list; fbody : expr; }
 
-type ftable = (ident, fdef) Hashtbl.t
-type gtable = (ident * ident, gdef) Hashtbl.t
+type gdef = gpdef IdentMap.t
 
-type program = { ftable : ftable; gtable : gtable; term : expr; }
+type fdef = {
+  fargs : ident list;
+  fbody : expr;
+}
+
+type fdefs = fdef IdentMap.t
+type gdefs = gdef IdentMap.t
+
+type program = {
+  fdefs : fdefs;
+  gdefs : gdefs;
+  term : expr;
+}
+
 type env = (ident * expr) list
 
 exception Interpret_error of string
@@ -42,32 +53,32 @@ let rec string_of_expr = function
   | GCall (name, parg, args) ->
       string_of_app name (List.map string_of_expr (parg :: args))
 
-let make_program fdefs gdefs term =
-  let (ftable : ftable) = Hashtbl.create (Array.length fdefs) in
-  let (gtable : gtable) = Hashtbl.create (Array.length gdefs) in
-  Array.iter (fun ({ fname; _ } as fdef) ->
-    Hashtbl.replace ftable fname fdef) fdefs;
-  Array.iter (fun ({ gname; pattern = { pname; _ }; _ } as gdef) ->
-    Hashtbl.replace gtable (gname, pname) gdef) gdefs;
-  { ftable; gtable; term; }
+let make_program fdefs_ls gpdefs_ls term =
+  let open IdentMap in
+  let fdefs = List.fold_left (fun acc (fname, fdef) ->
+    add fname fdef acc) empty fdefs_ls
+  in
+  let gdefs = List.fold_left (fun acc (gname, pname, gpdef) ->
+    let gdef = try find gname acc with Not_found -> empty in
+    add gname (add pname gpdef gdef) acc) empty gpdefs_ls
+  in
+  { fdefs; gdefs; term; }
 
-let string_of_fdef { fname; fargs; fbody; } =
+let string_of_fdef (fname, { fargs; fbody; }) =
   string_of_app fname fargs ^ " = " ^ string_of_expr fbody
 
-let string_of_pattern { pname; pargs; } = string_of_app pname pargs
-
-let string_of_gdef { gname; pattern; gargs; gbody; } =
-  string_of_app gname (string_of_pattern pattern :: gargs) ^
+let string_of_gpdef (gname, pname, { pargs; gargs; gbody; }) =
+  string_of_app gname (string_of_app pname pargs :: gargs) ^
     " = " ^ string_of_expr gbody
 
-let string_of_program { ftable; gtable; term; } =
+let string_of_program { fdefs; gdefs; term; } =
   let buffer = Buffer.create 16 in
-  let add_defs printer table =
-    Hashtbl.iter (fun _ def ->
-      Buffer.add_string buffer (printer def ^ "\n")) table
-  in
-  add_defs string_of_fdef ftable;
-  add_defs string_of_gdef gtable;
+  IdentMap.iter (fun fname fdef ->
+    Buffer.add_string buffer (string_of_fdef (fname, fdef) ^ "\n")) fdefs;
+  IdentMap.iter (fun gname gdef ->
+    IdentMap.iter (fun pname gpdef ->
+      Buffer.add_string buffer (string_of_gpdef (gname, pname, gpdef) ^ "\n"))
+    gdef) gdefs;
   Buffer.add_string buffer (string_of_expr term);
   Buffer.contents buffer
 
@@ -89,13 +100,13 @@ let from_int = function
   | Ctr ("N", [x]) -> -(from_nat x)
   | x -> from_nat x
 
-let run { ftable; gtable; term; } =
+let run { fdefs; gdefs; term; } =
   let rec intr = function
     | Var name -> raise (Interpret_error ("Undefined variable " ^ name))
     | Ctr (cname, cargs) -> Ctr (cname, List.map intr cargs)
     | FCall (fname, act_args) ->
-        let { fname; fargs; fbody; } = begin try
-            Hashtbl.find ftable fname
+        let { fargs; fbody; } = begin try
+            IdentMap.find fname fdefs
           with Not_found ->
             raise (Interpret_error ("f-definition not found: " ^ fname))
           end
@@ -104,8 +115,9 @@ let run { ftable; gtable; term; } =
     | GCall (gname, parg, act_args) ->
         begin match intr parg with
         | Ctr (cname, cargs) ->
-            let { gname; pattern = { pname; pargs }; gargs; gbody; } = begin try
-                Hashtbl.find gtable (gname, cname)
+            let { pargs; gargs; gbody; } = begin try
+                let gpdefs = IdentMap.find gname gdefs in
+                IdentMap.find cname gpdefs
               with Not_found ->
                 raise (Interpret_error ("g-definition not found: " ^
                                         gname ^ "(" ^ cname ^ "(...)...)"))
@@ -118,15 +130,16 @@ let run { ftable; gtable; term; } =
   in
   intr term
 
-let ( +> ) pname pargs = { pname; pargs; }
-let ( $  ) gname (pattern, gargs) = (gname, pattern, gargs)
-let ( => ) (gname, pattern, gargs) gbody = { gname; pattern; gargs; gbody; }
+let ( +> ) pname pargs = (pname, pargs)
+let ( $  ) gname ((pname, pargs), gargs) = (gname, pname, pargs, gargs)
+let ( => ) (gname, pname, pargs, gargs) gbody =
+  (gname, pname, { pargs; gargs; gbody; })
 
 let ( >$ ) fname fargs = (fname, fargs)
-let ( >= ) (fname, fargs) fbody = { fname; fargs; fbody; }
+let ( >= ) (fname, fargs) fbody = (fname, { fargs; fbody; })
 
 let () =
-  let gdefs = [|
+  let gdefs = [
     (* Subtraction for Non-Negative integers *)
     "snn"  $ ("Z" +> [],    ["y"]) => GCall ("neg", Var "y", []);
     "snn"  $ ("S" +> ["x"], ["y"]) => GCall ("sud", Var "y", [Var "x"]);
@@ -183,8 +196,8 @@ let () =
     (* Condition / if-then-else *)
     "cnd"  $ ("T" +> [], ["t"; "f"]) => Var "t";
     "cnd"  $ ("F" +> [], ["t"; "f"]) => Var "f";
-  |] in
-  let fdefs = [|
+  ] in
+  let fdefs = [
     (* Subtraction *)
     "sub" >$ ["x"; "y"] >= GCall ("add", Var "x", [GCall ("neg", Var "y", [])]);
 
@@ -208,7 +221,7 @@ let () =
     (* signed Modulo *)
     "mod" >$ ["x"; "y"] >= FCall ("sub", [ Var "x";
       GCall ("mul", FCall ("div", [Var "x"; Var "y"]), [Var "y"])]);
-  |] in
+  ] in
   let program = make_program fdefs gdefs (Ctr ("Z", [])) in
   print_endline (string_of_program program);
   let tester make_call func control x y =
