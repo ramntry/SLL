@@ -1,0 +1,102 @@
+#!/bin/bash
+# sll_bs -- Bootstrapping environment for SLL project (OCaml/Camlp5/Ostap)
+# Usage: ./sll_bs
+#
+# Author: Roman Tereshin <tereshin.roman@gmail.com>
+# Created: 2014-03-10
+
+cwd=`pwd`
+
+ocaml_major="4.01"
+ocaml_minor="0"
+ocaml_dir="ocaml-$ocaml_major.$ocaml_minor"
+ocaml_bin="$cwd/bin/$ocaml_dir"
+oops_src="$cwd/src"
+ocaml_tarball="$ocaml_dir.tar.gz"
+ocaml_tarball_url="http://caml.inria.fr/pub/distrib/ocaml-$ocaml_major/$ocaml_tarball"
+
+camlp5_dir="camlp5-6.11"
+camlp5_tarball="$camlp5_dir.tgz"
+camlp5_tarball_url="http://pauillac.inria.fr/~ddr/camlp5/distrib/src/$camlp5_tarball"
+
+oops_svn_url="https://oops.math.spbu.ru/svn"
+logger_svn_url="$oops_svn_url/logger/trunk"
+typeutil_svn_url="$oops_svn_url/typeutil/trunk"
+checked_svn_url="$oops_svn_url/checked/trunk"
+ostap_svn_url="$oops_svn_url/ostap/trunk"
+
+short_myself=$(basename $0)
+myself="$cwd/$short_myself"
+logfile="$cwd/$short_myself.log"
+
+if [ -z "$1" ]; then
+  $myself --no-log 2>&1 | tee -a "$logfile"
+  exit $?
+fi
+
+function die {
+  echo
+  echo "ERROR ($short_myself): $1"
+  exit 1
+}
+
+mkdir -p "$ocaml_bin" || die "Can not create directory. Check your access rights."
+mkdir -p "$oops_src"
+cd "$oops_src"
+
+echo "##### Obtaining and building OCaml"
+wget "$ocaml_tarball_url" || die "Can not download OCaml source distribution. Check wget program, URL and internet connection."
+tar -xzf "$ocaml_tarball" || die "Can not unpack OCaml source distribution. Check tar program, disk space and tarball name."
+cd "$ocaml_dir"
+./configure -prefix "$ocaml_bin" || die "Can not finish configure for OCaml. Check dependencies."
+
+make -j world.opt || make world.opt || die "Can not build OCaml. Check your screen or $logfile for details."
+make install || die "Can not install OCaml. Check disk space and your access rights."
+cd ../
+
+echo "export OOPS_SRC=\"$oops_src\"" >> "$cwd/setenv.sh"
+echo "export PATH=\"$ocaml_bin/bin:\$PATH\"" >> "$cwd/setenv.sh"
+. "$cwd/setenv.sh"
+
+echo "##### Obtaining and building Camlp5"
+wget "$camlp5_tarball_url" || die "Can not download Camlp5 source distribution. Check wget program, URL and internet connection."
+tar -xzf "$camlp5_tarball" || die "Can not unpack Camlp5 source distribution. Check tar program, disk space and tarball name."
+cd "$camlp5_dir"
+./configure --strict || die "Can not finish configure for Camlp5. Check dependencies."
+make -j world.opt || make world.opt || die "Can not build Camlp5. Check your screen or $logfile for details."
+make install || die "Can not install Camlp5. Check disk space and your access rights."
+cd ../
+
+function bs_oops_project {
+  echo p | svn co "$1" "$2" || sleep 3; echo p | svn co "$1" "$2" || die "Can not checkout $2 from $oops_svn_url. Check svn program, disk space and URLs."
+  cd "$2"
+  bash ./build.sh
+  if [ $? -ne 0 ]; then
+    echo "WARNING ($short_myself): ./build.sh for $2 was failed. Try to build by hand."
+    bash ./autogen.sh || die "Can not generate configure for $2. Check automake package and your screen or $logfile for dependencies."
+    ./configure || die "Can not finish configure for $2. Check dependencies."
+    make -j || make clean; make || die "Can not build $2. Check your screen or $logfile for details."
+  fi
+  make check || die "Some tests for $2 failed. Check your screen or $logfile for details."
+  make install || die "Can not install $2. Check disk space and your access rights."
+  cd ../
+}
+
+echo "##### Obtaining and building Ostap with dependencies"
+bs_oops_project "$logger_svn_url" logger
+bs_oops_project "$typeutil_svn_url" typeutil
+bs_oops_project "$checked_svn_url" checked
+bs_oops_project "$ostap_svn_url" ostap
+
+echo "##### Fixing some bugs in Ostap docs and sample and building it"
+cd ostap
+sed -i -e 's/pr_o.cmo//' doc/Makefile.am || die "Can not fix some bugs in doc/Makefile.am. Check sed program and doc/Makefile.am."
+make doc || die "Can not build ostap documenation. Check your screen of $logfile for details."
+sed -i -e 's/right \?,/`Righta,/' -e 's/left \?,/`Lefta,/' -e 's/expr[^funx]*$/expr (fun x -> x)/' sample/sample.ml || die "Can not fix some bugs in sample/sample.ml. Check sed program and sample/sample.ml"
+make -C sample || die "Can not build ostap/sample. Check your screen or $logfile for details."
+./sample/sample.opt
+
+echo
+echo "NOTE ($short_myself): run . setenv.sh for set environment variables (. stands for 'dot')"
+
+cd $cwd
