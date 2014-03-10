@@ -1,0 +1,15 @@
+*.cm[iox]
+*.o
+bin/
+setenv.sh
+sll_bs.log
+src/camlp5-6.11.tgz
+src/camlp5-6.11/
+src/checked/
+src/logger/
+src/ocaml-4.01.0.tar.gz
+src/ocaml-4.01.0/
+src/ostap/
+src/parser/parser
+src/sll/arithmtest
+src/typeutil/
