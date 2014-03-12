@@ -1,5 +1,23 @@
 open Sll
 
+let rec make_nat = function
+  | 0 -> Ctr ("Z", [])
+  | n -> Ctr ("S", [make_nat (n - 1)])
+
+let rec from_nat = function
+  | Ctr ("Z", [])  -> 0
+  | Ctr ("S", [x]) -> 1 + from_nat x
+  | x -> failwith ("(from_nat) bad nat: " ^ string_of_expr x)
+
+let make_int z =
+  if z < 0
+  then Ctr ("N", [make_nat (-z)])
+  else (make_nat z)
+
+let from_int = function
+  | Ctr ("N", [x]) -> -(from_nat x)
+  | x -> from_nat x
+
 let program =
   let gdefs = [
     (* Subtraction for Non-Negative integers *)
@@ -84,8 +102,7 @@ let program =
     "mod" >$ ["x"; "y"] >= FCall ("sub", [ Var "x";
       GCall ("mul", FCall ("div", [Var "x"; Var "y"]), [Var "y"])]);
   ] in
-  let minus_two = Ctr ("N", [Ctr ("S", [Ctr ("S", [Ctr ("Z", [])])])]) in
-  let one = Ctr ("S", [Ctr ("Z", [])]) in
-  let list1 = Ctr ("Cons", [minus_two; Ctr ("Nil", [])]) in
-  let list2 = Ctr ("Cons", [one; list1]) in
-  make_program fdefs gdefs list2
+  let x = make_int 71 in
+  let y = make_int (-25) in
+  let mul = GCall ("mul", x, [y]) in
+  make_program fdefs gdefs mul

@@ -1,29 +1,12 @@
 open Sll
 open Interpret
-
-let rec make_nat = function
-  | 0 -> Ctr ("Z", [])
-  | n -> Ctr ("S", [make_nat (n - 1)])
-
-let rec from_nat = function
-  | Ctr ("Z", [])  -> 0
-  | Ctr ("S", [x]) -> 1 + from_nat x
-  | x -> raise (Interpret_error ("(from_nat) bad nat: " ^ string_of_expr x))
-
-let make_int z =
-  if z < 0
-  then Ctr ("N", [make_nat (-z)])
-  else (make_nat z)
-
-let from_int = function
-  | Ctr ("N", [x]) -> -(from_nat x)
-  | x -> from_nat x
+open Arithm
 
 let () =
-  print_endline (string_of_program Arithm.program);
+  print_endline (string_of_program program);
   let tester make_call func control x y =
     let term = make_call func x y in
-    let program = { Arithm.program with term } in
+    let program = { program with term } in
     if run program = make_int (control x y)
     then print_string      " ok"
     else print_endline "\n [FAIL]"
@@ -84,7 +67,7 @@ let () =
   let x = make_int (read_int ()) in
   print_string "y (some integer again) = ";
   let y = make_int (read_int ()) in
-  let ratio  = run { Arithm.program with term = FCall ("div", [x; y]) } in
-  let modulo = run { Arithm.program with term = FCall ("mod", [x; y]) } in
+  let ratio  = run { program with term = FCall ("div", [x; y]) } in
+  let modulo = run { program with term = FCall ("mod", [x; y]) } in
   print_endline ("x / y = " ^ string_of_int (from_int ratio));
   print_endline ("x % y = " ^ string_of_int (from_int modulo));
