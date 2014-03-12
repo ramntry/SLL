@@ -18,6 +18,10 @@ let from_int = function
   | Ctr ("N", [x]) -> -(from_nat x)
   | x -> from_nat x
 
+let rec make_list = function
+  | []       -> Ctr ("Nil", [])
+  | hd :: tl -> Ctr ("Cons", [make_int hd; make_list tl])
+
 let program =
   let gdefs = [
     (* Subtraction for Non-Negative integers *)
@@ -76,6 +80,43 @@ let program =
     (* Condition / if-then-else *)
     "cnd"  $ ("T" +> [], ["t"; "f"]) => Var "t";
     "cnd"  $ ("F" +> [], ["t"; "f"]) => Var "f";
+
+    (* List Operations: Merge *)
+    "merge" $ ("Nil"  +> [],           ["b"]) => Var "b";
+    "merge" $ ("Cons" +> ["hd"; "tl"], ["b"]) =>
+      GCall ("merge2", Var "b", [Var "hd"; Var "tl"]);
+    "merge2" $ ("Nil" +> [], ["hda"; "tla"]) =>
+      Ctr ("Cons", [Var "hda"; Var "tla"]);
+    "merge2" $ ("Cons" +> ["hdb"; "tlb"], ["hda"; "tla"]) =>
+      GCall ("cnd",
+        GCall ("lss", Var "hda", [Var "hdb"]), [
+        Ctr ("Cons", [Var "hda";
+          GCall ("merge2", Var "tla", [Var "hdb"; Var "tlb"])]);
+        Ctr ("Cons", [Var "hdb";
+          GCall ("merge2", Var "tlb", [Var "hda"; Var "tla"])])]);
+
+    (* ListUp: [a, b, c] ~~> [[a], [b], [c]] *)
+    "listup" $ ("Nil" +> [], []) => Ctr ("Nil", []);
+    "listup" $ ("Cons" +> ["hd"; "tl"], []) =>
+      Ctr ("Cons", [
+        Ctr ("Cons", [Var "hd"; Ctr ("Nil", [])]);
+        GCall ("listup", Var "tl", [])]);
+
+    (* MaybeHead: [a, b] ~~> a && [] ~~> [] *)
+    "maybehead" $ ("Nil" +> [], []) => Ctr ("Nil", []);
+    "maybehead" $ ("Cons" +> ["hd"; "tl"], []) => Var "hd";
+
+    (* SortIters: [[c], [b], [d], [a]] ~~> [[a, b, c, d]] *)
+    "sortiters" $ ("Nil" +> [], []) => Ctr ("Nil", []);
+    "sortiters" $ ("Cons" +> ["hd"; "tl"], []) =>
+      GCall ("sortiters2", Var "tl", [Var "hd"]);
+    "sortiters2" $ ("Nil" +> [], ["hd"]) =>
+      Ctr ("Cons", [Var "hd"; Ctr ("Nil", [])]);
+    "sortiters2" $ ("Cons" +> ["hd2"; "tl"], ["hd"]) =>
+      GCall ("sortiters",
+        Ctr ("Cons", [
+          GCall ("merge", Var "hd", [Var "hd2"]);
+          GCall ("sortiters", Var "tl", [])]), []);
   ] in
   let fdefs = [
     (* Subtraction *)
@@ -101,8 +142,10 @@ let program =
     (* signed Modulo *)
     "mod" >$ ["x"; "y"] >= FCall ("sub", [ Var "x";
       GCall ("mul", FCall ("div", [Var "x"; Var "y"]), [Var "y"])]);
+
+    (* List Operations: MergeSort *)
+    "sort" >$ ["a"] >= GCall ("maybehead",
+      GCall ("sortiters", GCall ("listup", Var "a", []), []), []);
   ] in
-  let x = make_int 71 in
-  let y = make_int (-25) in
-  let mul = GCall ("mul", x, [y]) in
-  make_program fdefs gdefs mul
+  let a = make_list [4; 1; -2; 5; -3; 3; 0; -1; -4; 6; -5; 2] in
+  make_program fdefs gdefs (FCall ("sort", [a]))

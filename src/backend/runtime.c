@@ -28,10 +28,11 @@ Word *sll_allocate_object(size_t object_size) {
   size_t const size_in_words = object_size + 1;
   Word *const result = &new_block->mem[0];
   Word *curr = result + size_in_words;
-  sll_free_cell[object_size] = curr;
   Word *next = curr + size_in_words;
-  Word *block_end = &new_block->mem[SLL_BLOCK_SIZE];
-  while (next < block_end) {
+  Word *block_end = &new_block->mem[SLL_BLOCK_SIZE - size_in_words];
+  if (curr <= block_end)
+    sll_free_cell[object_size] = curr;
+  while (next <= block_end) {
     *curr = (Word)next;
     curr = next;
     next += size_in_words;
