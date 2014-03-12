@@ -84,4 +84,8 @@ let program =
     "mod" >$ ["x"; "y"] >= FCall ("sub", [ Var "x";
       GCall ("mul", FCall ("div", [Var "x"; Var "y"]), [Var "y"])]);
   ] in
-  make_program fdefs gdefs (Ctr ("Z", []))
+  let minus_two = Ctr ("N", [Ctr ("S", [Ctr ("S", [Ctr ("Z", [])])])]) in
+  let one = Ctr ("S", [Ctr ("Z", [])]) in
+  let list1 = Ctr ("Cons", [minus_two; Ctr ("Nil", [])]) in
+  let list2 = Ctr ("Cons", [one; list1]) in
+  make_program fdefs gdefs list2

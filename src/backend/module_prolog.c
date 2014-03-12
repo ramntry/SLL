@@ -23,7 +23,7 @@ static inline Object create_object_1(CtrId ctr_id, Object const _1) {
 }
 
 static inline Object create_object_2(CtrId ctr_id, Object const _1, Object const _2) {
-  Word *const cell = new_cell(1);
+  Word *const cell = new_cell(2);
   cell[0] = SLL_make_header((Word)ctr_id, 2);
   cell[1] = (Word)_1;
   cell[2] = (Word)_2;
@@ -31,7 +31,7 @@ static inline Object create_object_2(CtrId ctr_id, Object const _1, Object const
 }
 
 static inline Object create_object_3(CtrId ctr_id, Object const _1, Object const _2, Object const _3) {
-  Word *const cell = new_cell(1);
+  Word *const cell = new_cell(3);
   cell[0] = SLL_make_header((Word)ctr_id, 3);
   cell[1] = (Word)_1;
   cell[2] = (Word)_2;

@@ -111,6 +111,7 @@ let rec emit_expr indent buf = function
   | _ -> "NULL"
 
 let emit_fdef fname { fargs; fbody; } =
+  Names.reset ();
   let buf = Buffer.create 16 in
   Buffer.add_string buf (emit_fdecl fname fargs ^ " {\n");
   let result = emit_expr 2 buf fbody in
