@@ -6,18 +6,18 @@
 
 #define SLL_MAX_OBJECT_SIZE 15
 
+typedef uintptr_t Word;
+typedef Word const CtrId;
+typedef Word const *Object;
+
 #define SLL_make_header(ctr_id, object_size) \
   (((object_size) << 16) | ((ctr_id) & 0xFFFF))
 
 #define SLL_get_ctr_id(header) \
-  ((header) & 0xFFFF)
+  ((CtrId)((header) & 0xFFFF))
 
 #define SLL_get_osize(header) \
-  ((header) >> 16)
-
-typedef uintptr_t Word;
-typedef Word const CtrId;
-typedef Word const *Object;
+  ((size_t)((header) >> 16))
 
 extern Word *sll_free_cell[SLL_MAX_OBJECT_SIZE];
 
