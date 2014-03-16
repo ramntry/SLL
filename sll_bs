@@ -40,6 +40,17 @@ function die {
   exit 1
 }
 
+which automake || die "Can not find automake. Please, install automake package (version 1.11-1.12 will be the best)"
+automake --version | grep "1.13"
+if [ $? -eq 0 ]; then
+  echo "WARNING ($short_myself): Your version of automake is like to 1.13."
+  echo "WARNING ($short_myself): Using such version may cause some problems."
+  echo "WARNING ($short_myself): Consider roll back to the version 1.11 or 1.12 and restarting this script."
+  sleep 3
+  echo "WARNING ($short_myself): Bootstrapping will continue in 5 seconds. Press Ctrl+C for interrupt."
+  sleep 5
+fi
+
 mkdir -p "$ocaml_bin" || die "Can not create directory. Check your access rights."
 mkdir -p "$oops_src"
 cd "$oops_src"
@@ -50,7 +61,7 @@ tar -xzf "$ocaml_tarball" || die "Can not unpack OCaml source distribution. Chec
 cd "$ocaml_dir"
 ./configure -prefix "$ocaml_bin" || die "Can not finish configure for OCaml. Check dependencies."
 
-make -j world.opt || make world.opt || die "Can not build OCaml. Check your screen or $logfile for details."
+make -j world.opt || make clean; make world.opt || die "Can not build OCaml. Check your screen or $logfile for details."
 make install || die "Can not install OCaml. Check disk space and your access rights."
 cd ../
 
@@ -63,16 +74,18 @@ wget "$camlp5_tarball_url" || die "Can not download Camlp5 source distribution. 
 tar -xzf "$camlp5_tarball" || die "Can not unpack Camlp5 source distribution. Check tar program, disk space and tarball name."
 cd "$camlp5_dir"
 ./configure --strict || die "Can not finish configure for Camlp5. Check dependencies."
-make -j world.opt || make world.opt || die "Can not build Camlp5. Check your screen or $logfile for details."
+make -j world.opt || make clean; make world.opt || die "Can not build Camlp5. Check your screen or $logfile for details."
 make install || die "Can not install Camlp5. Check disk space and your access rights."
 cd ../
 
 function bs_oops_project {
   echo p | svn co "$1" "$2" || sleep 3; echo p | svn co "$1" "$2" || die "Can not checkout $2 from $oops_svn_url. Check svn program, disk space and URLs."
   cd "$2"
+  bash ./autoclean.sh
   bash ./build.sh
   if [ $? -ne 0 ]; then
     echo "WARNING ($short_myself): ./build.sh for $2 was failed. Try to build by hand."
+    bash ./autoclean.sh
     bash ./autogen.sh || die "Can not generate configure for $2. Check automake package and your screen or $logfile for dependencies."
     ./configure || die "Can not finish configure for $2. Check dependencies."
     make -j || make clean; make || die "Can not build $2. Check your screen or $logfile for details."
@@ -91,9 +104,9 @@ bs_oops_project "$ostap_svn_url" ostap
 echo "##### Fixing some bugs in Ostap docs and sample and building it"
 cd ostap
 sed -i -e 's/pr_o.cmo//' doc/Makefile.am || die "Can not fix some bugs in doc/Makefile.am. Check sed program and doc/Makefile.am."
-make doc || die "Can not build ostap documenation. Check your screen of $logfile for details."
+make doc || make clean; make doc || die "Can not build ostap documenation. Check your screen of $logfile for details."
 sed -i -e 's/right \?,/`Righta,/' -e 's/left \?,/`Lefta,/' -e 's/expr[^funx]*$/expr (fun x -> x)/' sample/sample.ml || die "Can not fix some bugs in sample/sample.ml. Check sed program and sample/sample.ml"
-make -C sample || die "Can not build ostap/sample. Check your screen or $logfile for details."
+make -C sample || make clean; make || die "Can not build ostap/sample. Check your screen or $logfile for details."
 ./sample/sample.opt
 
 echo
