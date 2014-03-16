@@ -27,6 +27,7 @@ arithmtest_emit: emit_c.cmx arithmtest_emit.cmx
 	ocamldep *.ml > .depend
 
 clean:
+	rm -f arithmtest.c
 	rm -f *.cm[ix]
 	rm -f *.o
 	rm -f .depend
