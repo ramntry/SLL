@@ -1,5 +1,2 @@
-open Sll
-
 exception Interpret_error of string
-
-val run : program -> expr
+val run : Sll.pure Sll.program -> Sll.pure
