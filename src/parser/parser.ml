@@ -7,12 +7,12 @@ open Sll
 let ident = ostap (n:IDENT {Token.repr n})
 let cnt = ostap (c:CNT {Token.repr c})
 
-let list_of_opt = function 
+let list_of_opt = function
   | Some xs -> xs
   | None    -> []
 
-let defs_splitter xs = 
-  let rec helper defs fdefs gdefs = 
+let defs_splitter xs =
+  let rec helper defs fdefs gdefs =
     match defs with
     | (`FRule (fn, b) :: smth)     -> helper smth ((fn, b) :: fdefs) gdefs
     | (`GRule (gn, pn, b) :: smth) -> helper smth fdefs ((gn, pn, b) :: gdefs)
@@ -20,39 +20,41 @@ let defs_splitter xs =
   in helper xs [] []
 
 ostap (
-    program_parser[e_parser]: defs:(funDef[e_parser])* -"." term:expression[e_parser] {
+  program_parser[e_parser]:
+    defs:(funDef[e_parser])* -"." term:expression[e_parser] {
       let (fdefs, gdefs) = defs_splitter defs in
       make_program fdefs gdefs term
     }
-    ;
-    funDef[e_parser]:
-      fRule[e_parser] | gRule[e_parser]
-    ;
-    fRule[e_parser]:
-      name:ident -"(" fargs:list0[ident] -")" -"=" body:e_parser
-      { `FRule (name >$ fargs >= body) }
-    ;
-    gRule[e_parser]:
-      name:ident -"(" pname:cnt pargs:ident_ctr_args gargs:(-"," ident)* -")"
-          -"=" gbody:e_parser 
-      { `GRule (name $ (pname +> pargs, gargs) => gbody) }
-    ;
-    args_list[e_parser]: -"(" list0[e_parser] -")" 
-    ;
-    expression[e_parser]:  
-        constructor[e_parser] 
-      | funCall[e_parser] 
-      | v:ident  { `Var v }
-    ;
-    ident_ctr_args:
-      pargs:(-"(" list0[ident] -")")? { list_of_opt pargs }
-    ;
-    constructor[e_parser]:
-      cname:cnt  args:args_list[e_parser]? 
-      { `Ctr cname (list_of_opt args) }
-    ;
-    funCall[e_parser]:
-      name:ident args:args_list[e_parser] { `FCall (name, args) }
+  ;
+  funDef[e_parser]:
+    fRule[e_parser] | gRule[e_parser]
+  ;
+  fRule[e_parser]:
+    name:ident -"(" fargs:list0[ident] -")" -"=" body:e_parser
+    { `FRule (name >$ fargs >= body) }
+  ;
+  gRule[e_parser]:
+    name:ident -"(" pname:cnt pargs:ident_ctr_args gargs:(-"," ident)* -")"
+        -"=" gbody:e_parser
+    { `GRule (name $ (pname +> pargs, gargs) => gbody) }
+  ;
+  args_list[e_parser]: -"(" list0[e_parser] -")"
+  ;
+  expression[e_parser]:
+      constructor[e_parser]
+    | funCall[e_parser]
+    | v:ident  { `Var v }
+  ;
+  ident_ctr_args:
+    pargs:(-"(" list0[ident] -")")? { list_of_opt pargs }
+  ;
+  constructor[e_parser]:
+    cname:cnt  args:args_list[e_parser]?
+    { `Ctr cname (list_of_opt args) }
+  ;
+  funCall[e_parser]:
+    name:ident args:args_list[e_parser]
+    { `FCall (name, args) }
 )
 
 class lexer s =
@@ -72,14 +74,6 @@ class lexer s =
 let rec pure_parser xs = expression pure_parser xs
 let program_parser = program_parser pure_parser
 
-let example =
-    "add(Z, x) = x\n"
-  ^ "add(S(x), y) = S(add(x, y))\n"
-  ^ ".\n"
-  ^ "add(S(Z), S(S(Z)))"
-
-let big_example = string_of_program string_of_pure Arithm.program
-
 let resolve_gcalls { fdefs = fdefs; gdefs = gdefs; term = term; } =
   let rec resolve_expr = function
     | `FCall (name, parg :: args) when not (Ident_map.mem name fdefs) ->
@@ -98,13 +92,29 @@ let resolve_gcalls { fdefs = fdefs; gdefs = gdefs; term = term; } =
       gpdefs) gdefs
   in
   { fdefs = resolved_fdefs; gdefs = resolved_gdefs; term = resolve_expr term; }
-          
+
+let parse source_text cont =
+  Combinators.unwrap (program_parser (new lexer source_text))
+    (fun program -> cont (resolve_gcalls program))
+    (fun reason ->
+      printf "Parser error:\n%s\n" (Reason.toString (`First 5) `Acc reason))
+
+let example =
+    "add(Z, x) = x\n"
+  ^ "add(S(x), y) = S(add(x, y))\n"
+  ^ ".\n"
+  ^ "add(S(Z), S(S(Z)))"
+
+let big_example = string_of_program string_of_pure Arithm.program
+
 let verbose_test () =
   Combinators.unwrap (program_parser (new lexer big_example))
-    (fun program -> printf "Parsed program:\n%s\n" (string_of_program string_of_pure program))
-    (fun reason -> printf "Parser error:\n%s\n" (Reason.toString (`First 3) `Acc reason))
+    (fun program ->
+      printf "Parsed program:\n%s\n" (string_of_program string_of_pure program))
+    (fun reason ->
+      printf "Parser error:\n%s\n" (Reason.toString (`First 3) `Acc reason))
 
-let () =
+let big_test () =
   Combinators.unwrap (program_parser (new lexer big_example))
     (fun program ->
        let result = Interpret.run (resolve_gcalls program) in
