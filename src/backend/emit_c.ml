@@ -38,10 +38,10 @@ let emit_declarations { fdefs; gdefs; term; } =
         S.union a (cnames_of_expr e)) init exprs
     in
     match expr with
-    | Var _ -> S.empty
-    | Ctr (cname, exprs) -> cnames_of_exprs (S.singleton cname) exprs
-    | FCall (_, exprs) -> cnames_of_exprs S.empty exprs
-    | GCall (_, ctr, exprs) -> cnames_of_exprs (cnames_of_expr ctr) exprs
+    | `Var _ -> S.empty
+    | `Ctr (cname, exprs) -> cnames_of_exprs (S.singleton cname) exprs
+    | `FCall (_, exprs) -> cnames_of_exprs S.empty exprs
+    | `GCall (_, ctr, exprs) -> cnames_of_exprs (cnames_of_expr ctr) exprs
   in
   let cnames_of_fdefs =
     Ident_map.fold (fun fname { fbody; fargs } a ->
@@ -94,8 +94,8 @@ let emit_val_def indent vname aname args =
     ^ emit_app aname args ^ ";\n"
 
 let rec emit_expr indent buf env = function
-  | Var name -> List.assoc name env
-  | Ctr (cname, exprs) ->
+  | `Var name -> List.assoc name env
+  | `Ctr (cname, exprs) ->
       let vname = Names.ctr cname in
       let numof_args = List.length exprs in
       let aname = "create_object_" ^ (string_of_int numof_args) in
@@ -103,13 +103,13 @@ let rec emit_expr indent buf env = function
       let val_def = emit_val_def indent vname aname (mangle cname :: args) in
       Buffer.add_string buf val_def;
       vname
-  | FCall (fname, exprs) ->
+  | `FCall (fname, exprs) ->
       let vname = Names.fcall fname in
       let args = List.map (fun e -> emit_expr indent buf env e) exprs in
       let val_def = emit_val_def indent vname (mangle fname) args in
       Buffer.add_string buf val_def;
       vname
-  | GCall (gname, ctr, exprs) ->
+  | `GCall (gname, ctr, exprs) ->
       let vname = Names.gcall gname in
       let ctrval = emit_expr indent buf env ctr in
       let args = List.map (fun e -> emit_expr indent buf env e) exprs in

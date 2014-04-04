@@ -3,7 +3,7 @@ open Interpret
 open Arithm
 
 let () =
-  print_endline (string_of_program program);
+  print_endline (string_of_program string_of_pure program);
   let tester make_call func control x y =
     let term = make_call func x y in
     let program = { program with term } in
@@ -11,7 +11,7 @@ let () =
     then print_string      " ok"
     else print_endline "\n [FAIL]"
   in
-  let test = tester (fun func x y -> GCall (func, make_int x, [make_int y])) in
+  let test = tester (fun func x y -> `GCall (func, make_int x, [make_int y])) in
   test  "snn" ( - )   8    5 ;
   test  "snn" ( - )   5    8 ;
   test  "snn" ( - )   8    0 ;
@@ -36,7 +36,7 @@ let () =
   test  "mul" ( * )   5  (-8);
   test  "mul" ( * ) (-8)   5 ;
   test  "mul" ( * ) (-8) (-5);
-  let testf = tester (fun func x y -> FCall (func, [make_int x; make_int y])) in
+  let testf = tester (fun func x y -> `FCall (func, [make_int x; make_int y])) in
   testf "sub" ( - )   5  (-8);
   testf "sub" ( - ) (-8)   5 ;
   testf "sub" ( - ) (-8) (-5);
@@ -67,7 +67,7 @@ let () =
   let x = make_int (read_int ()) in
   print_string "y (some integer again) = ";
   let y = make_int (read_int ()) in
-  let ratio  = run { program with term = FCall ("div", [x; y]) } in
-  let modulo = run { program with term = FCall ("mod", [x; y]) } in
+  let ratio  = run { program with term = `FCall ("div", [x; y]) } in
+  let modulo = run { program with term = `FCall ("mod", [x; y]) } in
   print_endline ("x / y = " ^ string_of_int (from_int ratio));
   print_endline ("x % y = " ^ string_of_int (from_int modulo));

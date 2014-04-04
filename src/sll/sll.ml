@@ -1,43 +1,68 @@
-type ident = string
-
-type expr =
-  | Var of ident
-  | Ctr of ident * expr list
-  | FCall of ident * expr list
-  | GCall of ident * expr * expr list
+type ident = String.t
 
 module Ident_map = Map.Make(String)
 
-type gpdef = {
+type 'e expr = [
+  | `Var   of ident
+  | `Ctr   of ident * 'e list
+  | `FCall of ident * 'e list
+  | `GCall of ident * 'e * 'e list
+]
+
+type 'e gpdef = {
   pargs : ident list;
   gargs : ident list;
-  gbody : expr;
+  gbody : 'e;
 }
 
-type gdef = gpdef Ident_map.t
+type 'e gdef = 'e gpdef Ident_map.t
 
-type fdef = {
+type 'e fdef = {
   fargs : ident list;
-  fbody : expr;
+  fbody : 'e;
 }
 
-type fdefs = fdef Ident_map.t
-type gdefs = gdef Ident_map.t
+type 'e fdefs = 'e fdef Ident_map.t
+type 'e gdefs = 'e gdef Ident_map.t
 
-type program = {
-  fdefs : fdefs;
-  gdefs : gdefs;
-  term : expr;
+type 'e program = {
+  fdefs : 'e fdefs;
+  gdefs : 'e gdefs;
+  term  : 'e;
 }
+
+type pure = pure expr
 
 let string_of_app name args = name ^ "(" ^ String.concat ", " args ^ ")"
 
-let rec string_of_expr = function
-  | Var vname -> vname
-  | Ctr (name, args) | FCall (name, args) ->
-      string_of_app name (List.map string_of_expr args)
-  | GCall (name, parg, args) ->
-      string_of_app name (List.map string_of_expr (parg :: args))
+let string_of_expr string_of_e = function
+  | `Var vname -> vname
+  | `Ctr (name, args) | `FCall (name, args) ->
+      string_of_app name (List.map string_of_e args)
+  | `GCall (name, parg, args) ->
+      string_of_app name (List.map string_of_e (parg :: args))
+
+let rec string_of_pure pure = string_of_expr string_of_pure pure
+
+let string_of_fdef string_of_e (fname, { fargs; fbody; }) =
+  string_of_app fname fargs ^ " = " ^ string_of_e fbody
+
+let string_of_gpdef string_of_e (gname, pname, { pargs; gargs; gbody; }) =
+  string_of_app gname (string_of_app pname pargs :: gargs) ^
+    " = " ^ string_of_e gbody
+
+let string_of_program string_of_e { fdefs; gdefs; term; } =
+  let buffer = Buffer.create 16 in
+  Ident_map.iter (fun fname fdef ->
+    Buffer.add_string buffer
+      (string_of_fdef string_of_e (fname, fdef) ^ "\n")) fdefs;
+  Ident_map.iter (fun gname gdef ->
+    Ident_map.iter (fun pname gpdef ->
+      Buffer.add_string buffer
+        (string_of_gpdef string_of_e (gname, pname, gpdef) ^ "\n"))
+    gdef) gdefs;
+  Buffer.add_string buffer (".\n" ^ string_of_e term);
+  Buffer.contents buffer
 
 let make_program fdefs_ls gpdefs_ls term =
   let open Ident_map in
@@ -50,24 +75,6 @@ let make_program fdefs_ls gpdefs_ls term =
   in
   { fdefs; gdefs; term; }
 
-let string_of_fdef (fname, { fargs; fbody; }) =
-  string_of_app fname fargs ^ " = " ^ string_of_expr fbody
-
-let string_of_gpdef (gname, pname, { pargs; gargs; gbody; }) =
-  string_of_app gname (string_of_app pname pargs :: gargs) ^
-    " = " ^ string_of_expr gbody
-
-let string_of_program { fdefs; gdefs; term; } =
-  let buffer = Buffer.create 16 in
-  Ident_map.iter (fun fname fdef ->
-    Buffer.add_string buffer (string_of_fdef (fname, fdef) ^ "\n")) fdefs;
-  Ident_map.iter (fun gname gdef ->
-    Ident_map.iter (fun pname gpdef ->
-      Buffer.add_string buffer (string_of_gpdef (gname, pname, gpdef) ^ "\n"))
-    gdef) gdefs;
-  Buffer.add_string buffer (".\n" ^ string_of_expr term);
-  Buffer.contents buffer
-
 let ( +> ) pname pargs = (pname, pargs)
 let ( $  ) gname ((pname, pargs), gargs) = (gname, pname, pargs, gargs)
 let ( => ) (gname, pname, pargs, gargs) gbody =
@@ -75,4 +82,3 @@ let ( => ) (gname, pname, pargs, gargs) gbody =
 
 let ( >$ ) fname fargs = (fname, fargs)
 let ( >= ) (fname, fargs) fbody = (fname, { fargs; fbody; })
-

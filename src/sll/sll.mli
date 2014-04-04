@@ -1,44 +1,51 @@
-type ident = string
+type ident = String.t
 
-type expr =
-  | Var of ident
-  | Ctr of ident * expr list
-  | FCall of ident * expr list
-  | GCall of ident * expr * expr list
+module Ident_map : module type of Map.Make(String) with type key := ident
 
-type gpdef = {
+type 'e expr = [
+  | `Var   of ident
+  | `Ctr   of ident * 'e list
+  | `FCall of ident * 'e list
+  | `GCall of ident * 'e * 'e list
+]
+
+type 'e gpdef = {
   pargs : ident list;
   gargs : ident list;
-  gbody : expr;
+  gbody : 'e;
 }
 
-type gdef = gpdef Ident_map.t
+type 'e gdef = 'e gpdef Ident_map.t
 
-type fdef = {
+type 'e fdef = {
   fargs : ident list;
-  fbody : expr;
+  fbody : 'e;
 }
 
-type fdefs = fdef Ident_map.t
-type gdefs = gdef Ident_map.t
+type 'e fdefs = 'e fdef Ident_map.t
+type 'e gdefs = 'e gdef Ident_map.t
 
-type program = {
-  fdefs : fdefs;
-  gdefs : gdefs;
-  term : expr;
+type 'e program = {
+  fdefs : 'e fdefs;
+  gdefs : 'e gdefs;
+  term  : 'e;
 }
 
-val string_of_expr : expr -> string
-val string_of_fdef : ident * fdef -> string
-val string_of_gpdef : ident * ident * gpdef -> string
-val string_of_program : program -> string
-val make_program :
-  (ident * fdef) list -> (ident * ident * gpdef) list -> expr -> program
+type pure = pure expr
+
+val string_of_expr : ('e -> string) -> 'e expr -> string
+val string_of_pure : pure -> string
+val string_of_fdef : ('e -> string) -> ident * 'e fdef -> string
+val string_of_gpdef : ('e -> string) -> ident * ident * 'e gpdef -> string
+val string_of_program : ('e -> string) -> 'e program -> string
+
+val make_program : (ident * 'e fdef) list -> (ident * ident * 'e gpdef) list
+  -> 'e -> 'e program
 
 val ( +> ) : ident -> ident list -> ident * ident list
 val ( $  ) : ident -> (ident * ident list) * ident list ->
   ident * ident * ident list * ident list
 val ( => ) :
-  ident * ident * ident list * ident list -> expr -> ident * ident * gpdef
+  ident * ident * ident list * ident list -> 'e -> ident * ident * 'e gpdef
 val ( >$ ) : ident -> ident list -> ident * ident list
-val ( >= ) : ident * ident list -> expr -> ident * fdef
+val ( >= ) : ident * ident list -> 'e -> ident * 'e fdef
