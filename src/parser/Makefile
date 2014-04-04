@@ -21,7 +21,7 @@ CAMLC_FLAGS = \
 CAMLD_FLAGS = \
 	-rectypes
 
-parser: parser.cmx
+parser_test: parser.cmx parser_test.cmx
 	${CAMLC} ${INCLUDE} ${CAMLD_FLAGS} ${LIBS} $^ -o $@
 
 .SUFFIXES: .ml .cmx
