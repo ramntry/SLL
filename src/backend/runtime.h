@@ -7,17 +7,23 @@
 #define SLL_MAX_OBJECT_SIZE 15
 
 typedef uintptr_t Word;
+typedef Word *Object;
 typedef Word const CtrId;
-typedef Word const *Object;
 
 #define SLL_make_header(ctr_id, object_size) \
-  (((object_size) << 16) | ((ctr_id) & 0xFFFF))
+  (((object_size) << 18) | ((ctr_id) & 0xFFFF))
 
 #define SLL_get_ctr_id(header) \
   ((CtrId)((header) & 0xFFFF))
 
 #define SLL_get_osize(header) \
-  ((size_t)((header) >> 16))
+  ((size_t)((header) >> 18))
+
+#define SLL_get_color(header) \
+  ((signed char)(((header) >> 16) & 0x3))
+
+#define SLL_set_color(header, color) \
+   ((header) | ((unsigned int)((color) & 0x3) << 16))
 
 struct RootsBlock {
   struct RootsBlock *const next;

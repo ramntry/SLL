@@ -147,5 +147,7 @@ let program =
     "sort" >$ ["a"] >= `GCall ("maybehead",
       `GCall ("sortiters", `GCall ("listup", `Var "a", []), []), []);
   ] in
-  let a = make_list [4; 1; -2; 5; -3; 3; 0; -1; -4; 6; -5; 2] in
+  let a = make_list (
+    List.map (fun x -> x * 100) [4; 1; -2; 5; -3; 3; 0; -1; -4; 6; -5; 2])
+  in
   make_program fdefs gdefs (`FCall ("sort", [a]))

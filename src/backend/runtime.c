@@ -5,6 +5,11 @@
 
 #define SLL_BLOCK_SIZE 2520
 
+enum GCColor {
+  SllWhite = 0,
+  SllBlack = 1
+};
+
 struct Block {
   struct Block *next;
   Word mem[SLL_BLOCK_SIZE];
@@ -19,7 +24,40 @@ void sll_fatal_error(char const *message) {
   exit(EXIT_FAILURE);
 }
 
+size_t live_counter;
+
+void sll_gc_dfs(Word *cell) {
+  if (SLL_get_color(cell[0]) == SllBlack)
+    return;
+  cell[0] = SLL_set_color(cell[0], SllBlack);
+  ++live_counter;
+  size_t const size = SLL_get_osize(cell[0]);
+  for (size_t i = 1; i <= size; ++i)
+    sll_gc_dfs((Word *)cell[i]);
+}
+
+void sll_gc_mark() {
+  live_counter = 0;
+  for (struct RootsBlock *block = sll_roots; block; block = block->next) {
+    size_t const size = block->size;
+    Object *objects = (Object *)(block + 1);
+    for (size_t i = 0; i < size; ++i)
+      if (objects[i])
+        sll_gc_dfs((Word *)objects[i]);
+  }
+  fprintf(stderr, "%zu objects marked\n", live_counter);
+}
+
+void sll_gc_sweep() {
+}
+
+void sll_gc_collect() {
+  sll_gc_mark();
+  sll_gc_sweep();
+}
+
 Word *sll_allocate_object(size_t object_size) {
+  sll_gc_collect();
   struct Block *new_block = (struct Block *)malloc(sizeof(struct Block));
   if (!new_block)
     sll_fatal_error("Out of memory");

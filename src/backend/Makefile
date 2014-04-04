@@ -1,4 +1,6 @@
 CAMLC = ocamlopt.opt
+CC = gcc
+CFLAGS = -std=c99 -pedantic -Wall -g
 
 INCLUDE = \
 	-I ${OOPS_SRC}/sll
@@ -16,10 +18,9 @@ all:
 	make -C ${OOPS_SRC}/sll
 	make arithmtest
 
-arithmtest: arithmtest.c arithmtest_emit runtime.c module_prolog.c module_epilog.c runtime.h
-	gcc -std=c99 -pedantic -Wall -O2 arithmtest.c runtime.c -o $@
+arithmtest: arithmtest.o runtime.o
 
-arithmtest.c: arithmtest_emit
+arithmtest.c: arithmtest_emit module_prolog.c module_epilog.c runtime.h
 	./arithmtest_emit > arithmtest.c
 
 arithmtest_emit: emit_c.cmx arithmtest_emit.cmx
