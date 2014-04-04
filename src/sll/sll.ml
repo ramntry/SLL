@@ -34,10 +34,15 @@ type 'e program = {
 type pure = pure expr
 
 let string_of_app name args = name ^ "(" ^ String.concat ", " args ^ ")"
+let string_of_app0 name = function
+  | [] -> name
+  | args -> string_of_app name args
 
 let string_of_expr string_of_e = function
   | `Var vname -> vname
-  | `Ctr (name, args) | `FCall (name, args) ->
+  | `Ctr (name, args) ->
+      string_of_app0 name (List.map string_of_e args)
+  | `FCall (name, args) ->
       string_of_app name (List.map string_of_e args)
   | `GCall (name, parg, args) ->
       string_of_app name (List.map string_of_e (parg :: args))
@@ -48,7 +53,7 @@ let string_of_fdef string_of_e (fname, { fargs; fbody; }) =
   string_of_app fname fargs ^ " = " ^ string_of_e fbody
 
 let string_of_gpdef string_of_e (gname, pname, { pargs; gargs; gbody; }) =
-  string_of_app gname (string_of_app pname pargs :: gargs) ^
+  string_of_app gname (string_of_app0 pname pargs :: gargs) ^
     " = " ^ string_of_e gbody
 
 let string_of_program string_of_e { fdefs; gdefs; term; } =
