@@ -2,6 +2,16 @@ open Sll
 open Interpret
 open Arithm
 
+let interactive_test () =
+  print_string "x (some integer value) = ";
+  let x = make_int (read_int ()) in
+  print_string "y (some integer again) = ";
+  let y = make_int (read_int ()) in
+  let ratio  = run { program with term = `FCall ("div", [x; y]) } in
+  let modulo = run { program with term = `FCall ("mod", [x; y]) } in
+  print_endline ("x / y = " ^ string_of_int (from_int ratio));
+  print_endline ("x % y = " ^ string_of_int (from_int modulo))
+
 let () =
   print_endline (string_of_program string_of_pure program);
   let tester make_call func control x y =
@@ -61,13 +71,4 @@ let () =
   testf "mod" (mod)   3  (-8);
   testf "mod" (mod) (-8)   3 ;
   testf "mod" (mod) (-8) (-3);
-  print_endline "";
-
-  print_string "x (some integer value) = ";
-  let x = make_int (read_int ()) in
-  print_string "y (some integer again) = ";
-  let y = make_int (read_int ()) in
-  let ratio  = run { program with term = `FCall ("div", [x; y]) } in
-  let modulo = run { program with term = `FCall ("mod", [x; y]) } in
-  print_endline ("x / y = " ^ string_of_int (from_int ratio));
-  print_endline ("x % y = " ^ string_of_int (from_int modulo));
+  print_endline ""
