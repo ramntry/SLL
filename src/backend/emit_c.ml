@@ -2,10 +2,10 @@ open Sll
 
 module Ident_map = Map.Make(String)
 
-let emit_prolog p =
+let emit_prolog _ =
   "#include \"module_prolog.c\"\n\n"
 
-let emit_epilog p =
+let emit_epilog _ =
   "#include \"module_epilog.c\""
 
 let mangle name =
@@ -66,29 +66,28 @@ let emit_declarations { fdefs; gdefs; term; } =
   Buffer.add_string enum "\n";
   Buffer.contents enum
 
-module Names =
-  struct
-    let (names : (ident, int) Hashtbl.t) = Hashtbl.create 16
+module Names = struct
+  let (names : (ident, int) Hashtbl.t) = Hashtbl.create 16
 
-    let make_name suggest =
-      if Hashtbl.mem names suggest
-      then begin
-        let counter = Hashtbl.find names suggest in
-        let result = suggest ^ "_" ^ (string_of_int counter) in
-        Hashtbl.replace names suggest (counter + 1);
-        result
-      end else begin
-        Hashtbl.add names suggest 1;
-        suggest
-      end
+  let make_name suggest =
+    if Hashtbl.mem names suggest
+    then begin
+      let counter = Hashtbl.find names suggest in
+      let result = suggest ^ "_" ^ (string_of_int counter) in
+      Hashtbl.replace names suggest (counter + 1);
+      result
+    end else begin
+      Hashtbl.add names suggest 1;
+      suggest
+    end
 
-    let ctr name = "ctr_" ^ make_name name
-    let fcall name = "fcall_" ^ make_name name
-    let gcall name = "gcall_" ^ make_name name
+  let ctr name = "ctr_" ^ make_name name
+  let fcall name = "fcall_" ^ make_name name
+  let gcall name = "gcall_" ^ make_name name
 
-    let reset () =
-      Hashtbl.clear names
-  end
+  let reset () =
+    Hashtbl.clear names
+end
 
 let emit_val_def indent vname aname args =
   String.make indent ' ' ^ "Object const " ^ vname ^ " = "
