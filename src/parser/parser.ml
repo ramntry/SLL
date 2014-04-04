@@ -60,24 +60,18 @@ let defs_splitter xs =
 
  	
 ostap (
-    program[e_parser]: funDef[e_parser] | expression[e_parser]
+    program[e_parser]: (funDef[e_parser] | expression[e_parser])*
     ;
     funDef[e_parser]:
-      fDef[e_parser] | gDef[e_parser]
-    ;
-    fDef[e_parser]: 
-      fRule[e_parser]
-    ;
-    gDef[e_parser]:
-      gRule[e_parser]
+      fRule[e_parser] | gRule[e_parser]
     ;
     fRule[e_parser]:
-      name:ident (*args:args_list[ident]*) -"(" fargs:list0[ident] -")" -"=" body:e_parser
-      { `FRule(name, { fargs = fargs; fbody = body })}
+      name:ident (*args:args_list[ident]*) -"(" (*fargs:list0[ident]*) -")" -"=" body:e_parser
+      { `FRule(name, { fargs = []; fbody = body })}
     ;
     gRule[e_parser]:
-      name:ident -"(" pname:cnt pargs:ident_ctr_args gargs:(-"," list[ident])? -")" -"=" gbody:e_parser 
-      { `GRule (name, pname, { pargs = pargs; gargs = (list_of_opt gargs); gbody = gbody }) } 
+      name:ident -"(" pname:cnt pargs:ident_ctr_args gargs:(-"," ident)* -")" -"=" gbody:e_parser 
+      { `GRule (name, pname, { pargs = pargs; gargs = gargs; gbody = gbody }) } 
     ;
     args_list[e_parser]: -"(" list0[e_parser] -")" 
     ;
@@ -107,7 +101,11 @@ let rec toString = function
             | `FCall (fn, ps)   ->  "FCall\n    FName " ^ fn ^ "\n    " ^ concat " \n    " (List.map toString ps)
             | `FRule (fn, { fargs = args; fbody = body;}) ->   "FRule\n    FName " ^ fn ^ "\n    " 
                  ^ concat " \n    " args ^ " \n   Body" ^ toString body
+            | `GRule (fn, pname, {pargs = pargs; gargs = gargs; gbody = gbody;}) ->   "GRule\n    FName " ^ fn ^ "\n  Pattern  " ^ pname ^ 
+               concat " \n pargs   " pargs ^ " \n  gArgs " ^ concat " \n    "  gargs ^ " \n   Body" ^ toString gbody
             | _                 -> "smth /n"
+
+let toString_prog xs = concat " " (List.map toString xs)
 
 class lexer s =
   let skip  = Skip.create [Skip.whitespaces " \n\t\r"] in
@@ -125,9 +123,9 @@ class lexer s =
 
 
 
-let rec pure_sll_parser xs = expression pure_sll_parser xs
-
+let rec pure_sll_parser xs = program pure_sll_parser xs
+(*rimpleFunc(Da, q1) = q*)
 let _ =
-  Combinators.unwrap (pure_sll_parser (new lexer "rimpleFunc(xa)"))
-    (fun tree -> printf "Parsed expression:\n%s\n" (toString tree))
+  Combinators.unwrap (pure_sll_parser (new lexer "rimpleFunc(Ds, assss, asss) = q\n rimsdfssssd(sdd,sdfsd,sdsss,ss,s)"))
+    (fun tree -> printf "Parsed expression:\n%s\n" (toString_prog tree))
     (fun reason -> printf "Parser error:\n%s\n" (Reason.toString (`First 3) `Acc reason))
