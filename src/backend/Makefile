@@ -1,11 +1,11 @@
 CAMLC = ocamlopt.opt
 
 INCLUDE = \
-	-I ${OOPS_SRC}/sll
+	-I ../sll
 
 LIBS = \
-	${OOPS_SRC}/sll/sll.cmx \
-	${OOPS_SRC}/sll/arithm.cmx
+	../sll/sll.cmx \
+	../sll/arithm.cmx
 
 CAMLC_FLAGS = \
 	-c
@@ -13,7 +13,7 @@ CAMLC_FLAGS = \
 CAMLD_FLAGS =
 
 all:
-	make -B -C ${OOPS_SRC}/sll
+	make -B -C ../sll
 	make arithmtest
 
 arithmtest: arithmtest_emit runtime.c module_prolog.c module_epilog.c runtime.h
