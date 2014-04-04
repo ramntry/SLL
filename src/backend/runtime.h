@@ -19,6 +19,12 @@ typedef Word const *Object;
 #define SLL_get_osize(header) \
   ((size_t)((header) >> 16))
 
+struct RootsBlock {
+  struct RootsBlock *const next;
+  size_t const size;
+};
+
+extern struct RootsBlock *sll_roots;
 extern Word *sll_free_cell[SLL_MAX_OBJECT_SIZE];
 
 void sll_fatal_error(char const *message);

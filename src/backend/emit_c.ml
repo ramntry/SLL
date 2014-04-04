@@ -72,28 +72,46 @@ let emit_declarations { fdefs; gdefs; term; } =
 module Names = struct
   let (names : (ident, int) Hashtbl.t) = Hashtbl.create 16
 
-  let make_name suggest =
+  let qualify name = "m." ^ name
+  let concat_name suggest = function
+    | 0 -> suggest
+    | counter -> suggest ^ "_" ^ (string_of_int counter)
+
+  let make_name suggest = (
     if Hashtbl.mem names suggest
     then begin
       let counter = Hashtbl.find names suggest in
-      let result = suggest ^ "_" ^ (string_of_int counter) in
       Hashtbl.replace names suggest (counter + 1);
-      result
+      concat_name suggest counter
     end else begin
       Hashtbl.add names suggest 1;
-      suggest
-    end
+      concat_name suggest 0
+    end)
+    |> qualify
 
-  let ctr name = "ctr_" ^ make_name name
-  let fcall name = "fcall_" ^ make_name name
-  let gcall name = "gcall_" ^ make_name name
+  let ctr name = make_name ("ctr_" ^ name)
+  let fcall name = make_name ("fcall_" ^ name)
+  let gcall name = make_name ("gcall_" ^ name)
+
+  let emit buf =
+    Buffer.add_string buf ("  struct {\n"
+      ^ "    struct RootsBlock header;\n");
+    let size = Hashtbl.fold (fun name counter acc ->
+      for i = 0 to counter - 1 do
+        Buffer.add_string buf ("    Object " ^ concat_name name i ^ ";\n")
+      done;
+      acc + counter) names 0
+    in
+    Buffer.add_string buf ("  } m = { { sll_roots, "
+      ^ string_of_int size ^ " } };\n"
+      ^ "  sll_roots = &m.header;\n")
 
   let reset () =
     Hashtbl.clear names
 end
 
 let emit_val_def indent vname aname args =
-  String.make indent ' ' ^ "Object const " ^ vname ^ " = "
+  String.make indent ' ' ^ vname ^ " = "
     ^ emit_app aname args ^ ";\n"
 
 let rec emit_expr indent buf env = function
@@ -123,15 +141,20 @@ let rec emit_expr indent buf env = function
 let emit_fdef fname { fargs; fbody; } =
   Names.reset ();
   let buf = Buffer.create 16 in
-  Buffer.add_string buf (emit_fdecl fname fargs ^ " {\n");
+  let header = Buffer.create 16 in
+  Buffer.add_string header (emit_fdecl fname fargs ^ " {\n");
   let env = List.combine fargs (List.map mangle fargs) in
   let result = emit_expr 2 buf env fbody in
-  Buffer.add_string buf ("  return " ^ result ^ ";\n}\n\n");
-  Buffer.contents buf
+  Buffer.add_string buf ("  sll_roots = m.header.next;\n"
+    ^ "  return " ^ result ^ ";\n}\n\n");
+  Names.emit header;
+  Buffer.add_buffer header buf;
+  Buffer.contents header
 
 let emit_gdef gname gpdefs =
   Names.reset ();
   let buf = Buffer.create 16 in
+  let header = Buffer.create 16 in
   let canonical_args = canonical_gargs gpdefs in
   let emit_case pname pargs gargs gbody =
     let penv = List.mapi (fun i arg ->
@@ -144,8 +167,8 @@ let emit_gdef gname gpdefs =
       ^ "      break;\n"
       ^ "  } ")
   in
-  Buffer.add_string buf (emit_gdecl gname gpdefs ^ " {\n"
-    ^ "  Object result = NULL;\n"
+  Buffer.add_string header (emit_gdecl gname gpdefs ^ " {\n");
+  Buffer.add_string buf ("  Object result = NULL;\n"
     ^ "  switch (SLL_get_ctr_id(ctr[0])) {\n"
     ^ "    ");
   Ident_map.iter (fun pname { pargs; gargs; gbody; } ->
@@ -153,8 +176,11 @@ let emit_gdef gname gpdefs =
   Buffer.add_string buf ("default:\n"
     ^ "      sll_fatal_error(\"Inexhaustive pattern matching\");\n"
     ^ "  }\n"
+    ^ "  sll_roots = m.header.next;\n"
     ^ "  return result;\n}\n\n");
-  Buffer.contents buf
+  Names.emit header;
+  Buffer.add_buffer header buf;
+  Buffer.contents header
 
 let emit_main { term; _ } =
   emit_fdef "create_main_term" { fargs = []; fbody = term; }

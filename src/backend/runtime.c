@@ -10,8 +10,9 @@ struct Block {
   Word mem[SLL_BLOCK_SIZE];
 };
 
-struct Block *sll_heap[SLL_MAX_OBJECT_SIZE];
+struct RootsBlock *sll_roots;
 Word *sll_free_cell[SLL_MAX_OBJECT_SIZE];
+struct Block *sll_heap[SLL_MAX_OBJECT_SIZE];
 
 void sll_fatal_error(char const *message) {
   fprintf(stderr, "SLL Fatal Error: %s\n", message);
