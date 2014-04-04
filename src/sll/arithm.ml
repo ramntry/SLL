@@ -20,7 +20,7 @@ let from_int = function
 
 let rec make_list = function
   | []       -> `Ctr ("Nil", [])
-  | hd :: tl -> `Ctr ("Cons", [make_int hd; make_list tl])
+  | hd :: tl -> `Ctr ("Cons", [hd; make_list tl])
 
 let program =
   let gdefs = [
@@ -78,8 +78,8 @@ let program =
     "sgn"  $ ("N" +> ["x"], []) => `Ctr ("N", [`Ctr ("S", [`Ctr ("Z", [])])]);
 
     (* Condition / if-then-else *)
-    "cnd"  $ ("T" +> [], ["t"; "f"]) => `Var "t";
-    "cnd"  $ ("F" +> [], ["t"; "f"]) => `Var "f";
+    "cnd"  $ ("T" +> [], ["t0"; "f0"]) => `Var "t0";
+    "cnd"  $ ("F" +> [], ["t1"; "f1"]) => `Var "f1";
 
     (* List Operations: Merge *)
     "merge" $ ("Nil"  +> [],           ["b"]) => `Var "b";
@@ -147,5 +147,8 @@ let program =
     "sort" >$ ["a"] >= `GCall ("maybehead",
       `GCall ("sortiters", `GCall ("listup", `Var "a", []), []), []);
   ] in
-  let a = make_list [4; 1; -2; 5; -3; 3; 0; -1; -4; 6; -5; 2] in
-  make_program fdefs gdefs (`FCall ("sort", [a]))
+  let a = [4; 1; -2; 5; -3; 3; 0; -1; -4; 6; -5; 2] in
+  let a = a @ (List.map (fun n -> n - 1) a) @ (List.map (fun n -> n + 1) a) in
+  let mult = make_int 100 in
+  make_program fdefs gdefs (`FCall ("sort", [make_list (
+    List.map (fun n -> `GCall ("mul", make_int n, [mult])) a)]))
