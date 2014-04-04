@@ -95,13 +95,16 @@ Word *sll_allocate_object(size_t object_size) {
 void sll_print_value(Object value, char const *const *ctr_names) {
   CtrId const ctr_id = SLL_get_ctr_id(value[0]);
   size_t const size = SLL_get_osize(value[0]);
-  printf("%s(", ctr_names[ctr_id]);
+  printf("%s", ctr_names[ctr_id]);
+  if (size)
+    printf("(");
   for (size_t i = 1; i <= size; ++i) {
     if (i > 1)
       printf(", ");
     sll_print_value((Object)value[i], ctr_names);
   }
-  printf(")");
+  if (size)
+    printf(")");
 }
 
 void sll_finalize() {
