@@ -1,103 +1,112 @@
-(*
- * Samlpe: Ostap sample.
- * Copyright (C) 2006-2009
- * Dmitri Boulytchev, St.Petersburg State University
- * 
- * This software is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License version 2, as published by the Free Software Foundation.
- * 
- * This software is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * See the GNU Library General Public License version 2 for more details
- * (enclosed in the file COPYING).
- *)
-
 open Printf
-open String
-open Str
 open Ostap
 open Util
 open Matcher
+open Sll
 
 let ident = ostap (n:IDENT {Token.repr n})
-let const = ostap (c:CONST {int_of_string (Token.repr c)})
+let cnt = ostap (c:CNT {Token.repr c})
 
-let rec toString e =
-  let prio = function
-    | `Op (`Add, _) | `Op (`Sub, _) -> 3
-    | `Op (`Mul, _) | `Op (`Div, _) | `Op (`Mod, _) -> 4
-    | `Op (`Lt , _) | `Op (`Le , _) | `Op (`Gt , _) | `Op (`Ge, _) | `Op (`Eq, _) | `Op (`Neq, _) -> 2
-    | `Op (`And, _) | `Op (`Or , _) -> 1
-    | _ -> 5
-  in
-  let pe = prio e in
-  let enclose e =
-    (if prio e < pe then fun x -> "(" ^ x ^ ")" else fun x -> x) (toString e)
-  in
-  match e with
-  | `Op (`Add, (x, y)) -> (enclose x) ^ " + "  ^ (enclose y)
-  | `Op (`Sub, (x, y)) -> (enclose x) ^ " - "  ^ (enclose y)
-  | `Op (`Mul, (x, y)) -> (enclose x) ^ " * "  ^ (enclose y)
-  | `Op (`Div, (x, y)) -> (enclose x) ^ " / "  ^ (enclose y)
-  | `Op (`Mod, (x, y)) -> (enclose x) ^ " % "  ^ (enclose y)
-  | `Op (`Eq , (x, y)) -> (enclose x) ^ " == " ^ (enclose y)
-  | `Op (`Neq, (x, y)) -> (enclose x) ^ " != " ^ (enclose y)
-  | `Op (`Lt , (x, y)) -> (enclose x) ^ " < "  ^ (enclose y)
-  | `Op (`Le , (x, y)) -> (enclose x) ^ " <= " ^ (enclose y)
-  | `Op (`Gt , (x, y)) -> (enclose x) ^ " > "  ^ (enclose y)
-  | `Op (`Ge , (x, y)) -> (enclose x) ^ " >= " ^ (enclose y)
-  | `Op (`And, (x, y)) -> (enclose x) ^ " && " ^ (enclose y)
-  | `Op (`Or , (x, y)) -> (enclose x) ^ " || " ^ (enclose y)
-  | `Neg   x           -> "-" ^ (enclose x)
-  | `Not   e           -> "!" ^ (enclose e)
-  | `Int   n           -> string_of_int n
-  | `Name  s           -> s
+let list_of_opt = function 
+  | Some xs -> xs
+  | None    -> []
 
-let rec parse s =
-  expr (fun x -> x)
-    [|
-      `Righta, [(ostap ("&&")), (fun x y -> `Op `And (x, y)); (ostap ("||")), (fun x y -> `Op `Or (x, y))];
-      `Righta, [
-        (ostap ("==")), (fun x y -> `Op `Eq  (x, y));
-        (ostap ("!=")), (fun x y -> `Op `Neq (x, y));
-        (ostap (">")) , (fun x y -> `Op `Gt  (x, y));
-        (ostap (">=")), (fun x y -> `Op `Ge  (x, y));
-        (ostap ("<")) , (fun x y -> `Op `Lt  (x, y));
-        (ostap ("<=")), (fun x y -> `Op `Le  (x, y))
-      ];
-      `Lefta, [(ostap ("+")), (fun x y -> `Op `Add (x, y)); (ostap ("-")), (fun x y -> `Op `Sub (x, y))];
-      `Lefta, [(ostap ("*")), (fun x y -> `Op `Mul (x, y)); (ostap ("/")), (fun x y -> `Op `Div (x, y)); (ostap ("%")), (fun x y -> `Op `Mod (x, y))]
-    |]
-    primary
-    s
-and ostap (
-  primary:
-    n:ident           {`Name n}
-  | c:const           {`Int  c}
-  | "-" p:primary     {`Neg  p}
-  | "!" p:primary     {`Not  p}
-  | -"(" parse -")" 
- )
+let defs_splitter xs = 
+  let rec helper defs fdefs gdefs = 
+    match defs with
+    | (`FRule (fn, b) :: smth)     -> helper smth ((fn, b) :: fdefs) gdefs
+    | (`GRule (gn, pn, b) :: smth) -> helper smth fdefs ((gn, pn, b) :: gdefs)
+    | []                           -> (fdefs, gdefs)
+  in helper xs [] []
+
+ostap (
+    program_parser[e_parser]: defs:(funDef[e_parser])* -"." term:expression[e_parser] {
+      let (fdefs, gdefs) = defs_splitter defs in
+      make_program fdefs gdefs term
+    }
+    ;
+    funDef[e_parser]:
+      fRule[e_parser] | gRule[e_parser]
+    ;
+    fRule[e_parser]:
+      name:ident -"(" fargs:list0[ident] -")" -"=" body:e_parser
+      { `FRule (name >$ fargs >= body) }
+    ;
+    gRule[e_parser]:
+      name:ident -"(" pname:cnt pargs:ident_ctr_args gargs:(-"," ident)* -")"
+          -"=" gbody:e_parser 
+      { `GRule (name $ (pname +> pargs, gargs) => gbody) }
+    ;
+    args_list[e_parser]: -"(" list0[e_parser] -")" 
+    ;
+    expression[e_parser]:  
+        constructor[e_parser] 
+      | funCall[e_parser] 
+      | v:ident  { `Var v }
+    ;
+    ident_ctr_args:
+      pargs:(-"(" list0[ident] -")")? { list_of_opt pargs }
+    ;
+    constructor[e_parser]:
+      cname:cnt  args:args_list[e_parser]? 
+      { `Ctr cname (list_of_opt args) }
+    ;
+    funCall[e_parser]:
+      name:ident args:args_list[e_parser] { `FCall (name, args) }
+)
 
 class lexer s =
   let skip  = Skip.create [Skip.whitespaces " \n\t\r"] in
-  let ident = Str.regexp "[a-zA-Z][a-zA-Z0-9]*" in
-  let const = Str.regexp "[0-9]+" in
-
+  let ident = Str.regexp "[a-z][a-zA-Z0-9]*" in
+  let cnt = Str.regexp "[A-Z][a-zA-Z0-9]*" in
   object (self)
 
     inherit t s
 
     method skip p c = skip s p c
     method getIDENT = self#get "identifier" ident
-    method getCONST = self#get "constant" const
+    method getCNT   = self#get "constructor" cnt
 
   end
 
-let _ =
-  Combinators.unwrap (parse (new lexer "a+b*3-(4-2)"))
-    (fun tree -> printf "Parsed tree:\n%s\n" (toString tree))
+let rec pure_parser xs = expression pure_parser xs
+let program_parser = program_parser pure_parser
+
+let example =
+    "add(Z, x) = x\n"
+  ^ "add(S(x), y) = S(add(x, y))\n"
+  ^ ".\n"
+  ^ "add(S(Z), S(S(Z)))"
+
+let big_example = string_of_program string_of_pure Arithm.program
+
+let resolve_gcalls { fdefs = fdefs; gdefs = gdefs; term = term; } =
+  let rec resolve_expr = function
+    | `FCall (name, parg :: args) when not (Ident_map.mem name fdefs) ->
+        `GCall (name, resolve_expr parg, List.map resolve_expr args)
+    | `FCall (fname, fargs) -> `FCall (fname, List.map resolve_expr fargs)
+    | `GCall (gname, pname, gargs) -> `GCall (gname, pname, gargs)
+    | `Ctr (cname, cargs) -> `Ctr (cname, List.map resolve_expr cargs)
+    | `Var name -> `Var name
+  in
+  let resolved_fdefs = Ident_map.map (fun { fargs = fargs; fbody = fbody; } ->
+    { fargs = fargs; fbody = resolve_expr fbody } ) fdefs
+  in
+  let resolved_gdefs = Ident_map.map (fun gpdefs ->
+    Ident_map.map (fun { pargs = pargs; gargs = gargs; gbody = gbody; } ->
+      { pargs = pargs; gargs = gargs; gbody = resolve_expr gbody; })
+      gpdefs) gdefs
+  in
+  { fdefs = resolved_fdefs; gdefs = resolved_gdefs; term = resolve_expr term; }
+          
+let verbose_test () =
+  Combinators.unwrap (program_parser (new lexer big_example))
+    (fun program -> printf "Parsed program:\n%s\n" (string_of_program string_of_pure program))
     (fun reason -> printf "Parser error:\n%s\n" (Reason.toString (`First 3) `Acc reason))
+
+let () =
+  Combinators.unwrap (program_parser (new lexer big_example))
+    (fun program ->
+       let result = Interpret.run (resolve_gcalls program) in
+       printf "%s\n" (string_of_pure result))
+    (fun _ -> ())
