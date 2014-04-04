@@ -24,20 +24,16 @@ void sll_fatal_error(char const *message) {
   exit(EXIT_FAILURE);
 }
 
-size_t live_counter;
-
 void sll_gc_dfs(Word *cell) {
   if (SLL_get_color(cell[0]) == SllBlack)
     return;
   cell[0] = SLL_set_color(cell[0], SllBlack);
-  ++live_counter;
   size_t const size = SLL_get_osize(cell[0]);
   for (size_t i = 1; i <= size; ++i)
     sll_gc_dfs((Word *)cell[i]);
 }
 
 void sll_gc_mark() {
-  live_counter = 0;
   for (struct RootsBlock *block = sll_roots; block; block = block->next) {
     size_t const size = block->size;
     Object *objects = (Object *)(block + 1);
@@ -45,19 +41,41 @@ void sll_gc_mark() {
       if (objects[i])
         sll_gc_dfs((Word *)objects[i]);
   }
-  fprintf(stderr, "%zu objects marked\n", live_counter);
 }
 
-void sll_gc_sweep() {
+void sll_gc_clear_color(size_t object_size) {
+  size_t const size_in_words = object_size + 1;
+  size_t const block_size = (SLL_BLOCK_SIZE / size_in_words) * size_in_words;
+  for (struct Block *block = sll_heap[object_size]; block; block = block->next)
+    for (size_t i = 0; i < block_size; i += size_in_words)
+      block->mem[i] = SLL_set_color(block->mem[i], SllWhite);
 }
 
-void sll_gc_collect() {
+void sll_gc_sweep(size_t object_size) {
+  size_t const size_in_words = object_size + 1;
+  size_t const block_size = (SLL_BLOCK_SIZE / size_in_words) * size_in_words;
+  for (struct Block *block = sll_heap[object_size]; block; block = block->next)
+    for (size_t i = 0; i < block_size; i += size_in_words)
+      if (SLL_get_color(block->mem[i]) == SllWhite) {
+        block->mem[i] = (Word)sll_free_cell[object_size];
+        sll_free_cell[object_size] = &block->mem[i];
+      }
+}
+
+void sll_gc_collect(size_t object_size) {
+  sll_gc_clear_color(object_size);
   sll_gc_mark();
-  sll_gc_sweep();
+  sll_gc_sweep(object_size);
 }
 
 Word *sll_allocate_object(size_t object_size) {
-  sll_gc_collect();
+  sll_gc_collect(object_size);
+  Word *const cell = sll_free_cell[object_size];
+  if (cell) {
+    sll_free_cell[object_size] = (Word *)cell[0];
+    return cell;
+  }
+
   struct Block *new_block = (struct Block *)malloc(sizeof(struct Block));
   if (!new_block)
     sll_fatal_error("Out of memory");
@@ -65,19 +83,13 @@ Word *sll_allocate_object(size_t object_size) {
   sll_heap[object_size] = new_block;
 
   size_t const size_in_words = object_size + 1;
-  Word *const result = &new_block->mem[0];
-  Word *curr = result + size_in_words;
-  Word *next = curr + size_in_words;
-  Word *block_end = &new_block->mem[SLL_BLOCK_SIZE - size_in_words];
-  if (curr <= block_end)
-    sll_free_cell[object_size] = curr;
-  while (next <= block_end) {
-    *curr = (Word)next;
-    curr = next;
-    next += size_in_words;
-  }
-  *curr = (Word)NULL;
-  return result;
+  size_t const block_size = (SLL_BLOCK_SIZE / size_in_words) * size_in_words;
+  if (block_size > size_in_words)
+    sll_free_cell[object_size] = &new_block->mem[size_in_words];
+  for (size_t i = 2 * size_in_words; i < block_size; i += size_in_words)
+    new_block->mem[i - size_in_words] = (Word)&new_block->mem[i];
+  new_block->mem[block_size - size_in_words] = 0;
+  return &new_block->mem[0];
 }
 
 void sll_print_value(Object value, char const *const *ctr_names) {
