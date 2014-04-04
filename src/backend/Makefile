@@ -1,4 +1,6 @@
 CAMLC = ocamlopt.opt
+CC = gcc
+CFLAGS = -std=c99 -pedantic -Wall -O2
 
 INCLUDE = \
 	-I ../sll
@@ -13,12 +15,13 @@ CAMLC_FLAGS = \
 CAMLD_FLAGS =
 
 all:
-	make -B -C ../sll
+	make -C ../sll
 	make arithmtest
 
-arithmtest: arithmtest_emit runtime.c module_prolog.c module_epilog.c runtime.h
+arithmtest: arithmtest.o runtime.o
+
+arithmtest.c: arithmtest_emit module_prolog.c module_epilog.c runtime.h
 	./arithmtest_emit > arithmtest.c
-	gcc -std=c99 -pedantic -Wall -O2 arithmtest.c runtime.c -o $@
 
 arithmtest_emit: emit_c.cmx arithmtest_emit.cmx
 	${CAMLC} ${INCLUDE} ${CAMLD_FLAGS} ${LIBS} $^ -o $@
