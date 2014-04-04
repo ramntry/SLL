@@ -105,8 +105,8 @@ let rec toString = function
             | `Var v            -> "Var  " ^ v
             | `Ctr (x,ps)       -> "Ctr " ^ x ^ "\n    " ^ (concat " \n    " (List.map toString ps))
             | `FCall (fn, ps)   ->  "FCall\n    FName " ^ fn ^ "\n    " ^ concat " \n    " (List.map toString ps)
-            (*| `FRule (fn, { p;s; e;}) ->   "FRule\n    FName " ^ fn ^ "\n    " 
-                 ^ concat " \n    " (List.map toString p) ^ " \n   Body" ^ toString e*)
+            | `FRule (fn, { fargs = args; fbody = body;}) ->   "FRule\n    FName " ^ fn ^ "\n    " 
+                 ^ concat " \n    " args ^ " \n   Body" ^ toString body
             | _                 -> "smth /n"
 
 class lexer s =
