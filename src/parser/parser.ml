@@ -108,5 +108,5 @@ let () =
   Combinators.unwrap (program_parser (new lexer big_example))
     (fun program ->
        let result = Interpret.run (resolve_gcalls program) in
-       printf "Result:\n%s\n" (string_of_pure result))
+       printf "%s\n" (string_of_pure result))
     (fun _ -> ())
