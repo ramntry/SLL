@@ -21,9 +21,12 @@ let emit_decl name args =
 let emit_fdecl fname fargs =
   emit_decl fname (List.map mangle fargs)
 
-let emit_gdecl gname gpdefs =
+let canonical_gargs gpdefs =
   let (_, { gargs; _ }) = Ident_map.choose gpdefs in
-  emit_decl gname ("ctr" :: List.map mangle gargs)
+  List.map mangle gargs
+
+let emit_gdecl gname gpdefs =
+  emit_decl gname ("ctr" :: canonical_gargs gpdefs)
 
 let emit_declarations { fdefs; gdefs; term; } =
   let enum = Buffer.create 16 in
@@ -129,11 +132,12 @@ let emit_fdef fname { fargs; fbody; } =
 let emit_gdef gname gpdefs =
   Names.reset ();
   let buf = Buffer.create 16 in
+  let canonical_args = canonical_gargs gpdefs in
   let emit_case pname pargs gargs gbody =
     let penv = List.mapi (fun i arg ->
       (arg, "(Object)ctr[" ^ string_of_int (i + 1) ^ "]")) pargs
     in
-    let genv = List.combine gargs (List.map mangle gargs) in
+    let genv = List.combine gargs canonical_args in
     Buffer.add_string buf ("case " ^ mangle pname ^ ": {\n");
     let result = emit_expr 6 buf (penv @ genv) gbody in
     Buffer.add_string buf ("      result = " ^ result ^ ";\n"

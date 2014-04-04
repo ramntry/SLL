@@ -78,8 +78,8 @@ let program =
     "sgn"  $ ("N" +> ["x"], []) => `Ctr ("N", [`Ctr ("S", [`Ctr ("Z", [])])]);
 
     (* Condition / if-then-else *)
-    "cnd"  $ ("T" +> [], ["t0"; "f0"]) => Var "t0";
-    "cnd"  $ ("F" +> [], ["t1"; "f1"]) => Var "f1";
+    "cnd"  $ ("T" +> [], ["t0"; "f0"]) => `Var "t0";
+    "cnd"  $ ("F" +> [], ["t1"; "f1"]) => `Var "f1";
 
     (* List Operations: Merge *)
     "merge" $ ("Nil"  +> [],           ["b"]) => `Var "b";
