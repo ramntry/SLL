@@ -24,7 +24,7 @@ void sll_fatal_error(char const *message) {
   exit(EXIT_FAILURE);
 }
 
-void sll_gc_dfs(Word *cell) {
+static inline void sll_gc_dfs(Word *const cell) {
   if (SLL_get_color(cell[0]) == SllBlack)
     return;
   cell[0] = SLL_set_color(cell[0], SllBlack);
