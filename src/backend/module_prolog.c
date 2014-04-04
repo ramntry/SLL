@@ -1,7 +1,7 @@
 #include "runtime.h"
 
 static inline Word *new_cell(size_t const object_size) {
-  Word *cell = sll_free_cell[object_size];
+  Word *const cell = sll_free_cell[object_size];
   if (cell) {
     sll_free_cell[object_size] = (Word *)cell[0];
     return cell;
