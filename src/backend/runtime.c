@@ -43,33 +43,28 @@ void sll_gc_mark() {
   }
 }
 
-void sll_gc_clear_color(size_t object_size) {
-  size_t const size_in_words = object_size + 1;
-  size_t const block_size = (SLL_BLOCK_SIZE / size_in_words) * size_in_words;
-  for (struct Block *block = sll_heap[object_size]; block; block = block->next)
-    for (size_t i = 0; i < block_size; i += size_in_words)
-      block->mem[i] = SLL_set_color(block->mem[i], SllWhite);
+void sll_gc_sweep() {
+  for (size_t object_size = 0; object_size < SLL_MAX_OBJECT_SIZE; ++object_size) {
+    sll_free_cell[object_size] = NULL;
+    size_t const size_in_words = object_size + 1;
+    size_t const block_size = (SLL_BLOCK_SIZE / size_in_words) * size_in_words;
+    for (struct Block *block = sll_heap[object_size]; block; block = block->next)
+      for (size_t i = 0; i < block_size; i += size_in_words)
+        if (SLL_get_color(block->mem[i]) == SllWhite) {
+          block->mem[i] = (Word)sll_free_cell[object_size];
+          sll_free_cell[object_size] = &block->mem[i];
+        } else
+          block->mem[i] = SLL_set_color(block->mem[i], SllWhite);
+  }
 }
 
-void sll_gc_sweep(size_t object_size) {
-  size_t const size_in_words = object_size + 1;
-  size_t const block_size = (SLL_BLOCK_SIZE / size_in_words) * size_in_words;
-  for (struct Block *block = sll_heap[object_size]; block; block = block->next)
-    for (size_t i = 0; i < block_size; i += size_in_words)
-      if (SLL_get_color(block->mem[i]) == SllWhite) {
-        block->mem[i] = (Word)sll_free_cell[object_size];
-        sll_free_cell[object_size] = &block->mem[i];
-      }
-}
-
-void sll_gc_collect(size_t object_size) {
-  sll_gc_clear_color(object_size);
+void sll_gc_collect() {
   sll_gc_mark();
-  sll_gc_sweep(object_size);
+  sll_gc_sweep();
 }
 
 Word *sll_allocate_object(size_t object_size) {
-  sll_gc_collect(object_size);
+  //sll_gc_collect();
   Word *const cell = sll_free_cell[object_size];
   if (cell) {
     sll_free_cell[object_size] = (Word *)cell[0];
