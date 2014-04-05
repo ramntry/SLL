@@ -124,7 +124,7 @@ void sll_print_value(Object value, char const *const *ctr_names) {
     printf(")");
 }
 
-static int lex_next() {
+static int lex_next(int skip_newline) {
   if (next_lexeme) {
     int const result = next_lexeme;
     next_lexeme = 0;
@@ -132,7 +132,9 @@ static int lex_next() {
   }
   int next_char = 0;
   do next_char = getchar();
-  while (isspace(next_char));
+  while (isspace(next_char) && (skip_newline || next_char != '\n'));
+  if (next_char == '\n')
+    return SllEof;
   switch (next_char) {
     case '(':
     case ')':
@@ -153,14 +155,14 @@ static int lex_next() {
   return SllCtrName;
 }
 
-static inline int lex_look() {
+static inline int lex_look(int skip_newline) {
   if (next_lexeme)
     return next_lexeme;
-  return next_lexeme = lex_next();
+  return next_lexeme = lex_next(skip_newline);
 }
 
 static inline void lex_take(int lexeme) {
-  if (lexeme != lex_next())
+  if (lexeme != lex_next(1))
     sll_fatal_error("Unexpected lexeme in standard input");
 }
 
@@ -168,7 +170,7 @@ static inline int string_comp(void const *const lhs, void const *const rhs) {
   return strcmp(*(char const *const *)lhs, *(char const *const *)rhs);
 }
 
-static Object parse_value(char const *const *ctr_names, size_t numof_ctrs) {
+static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int skip_newline) {
   static char const *const key = ctr_name_buf;
   lex_take(SllCtrName);
   CtrId const ctr_id = (char const *const *)
@@ -177,13 +179,13 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs) {
     sll_fatal_error("Unexpected constructor name");
   size_t numof_args = 0;
   Object args[SLL_MAX_OBJECT_SIZE];
-  if (lex_look() == '(') {
+  if (lex_look(skip_newline) == '(') {
     lex_take('(');
-    if (lex_look() == SllCtrName) {
-      args[numof_args++] = parse_value(ctr_names, numof_ctrs);
-      while (lex_look() == ',') {
+    if (lex_look(1) == SllCtrName) {
+      args[numof_args++] = parse_value(ctr_names, numof_ctrs, 1);
+      while (lex_look(1) == ',') {
         lex_take(',');
-        args[numof_args++] = parse_value(ctr_names, numof_ctrs);
+        args[numof_args++] = parse_value(ctr_names, numof_ctrs, 1);
       }
     }
     lex_take(')');
@@ -197,7 +199,7 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs) {
 
 Object sll_read_value(char const *vname, char const *const *ctr_names, size_t numof_ctrs) {
   printf("%s = ", vname);
-  return parse_value(ctr_names, numof_ctrs);
+  return parse_value(ctr_names, numof_ctrs, 0);
 }
 
 void sll_finalize() {
