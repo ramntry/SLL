@@ -46,6 +46,9 @@ clean:
 	rm -f *.cm[ix]
 	rm -f *.o
 	rm -f .depend
+	make clean -C ../backend
+	make clean -C ../parser
+	make clean -C ../sll
 
 .SUFFIXES: .ml .cmx .mli .cmi
 
