@@ -148,7 +148,9 @@ let program =
       `GCall ("sortiters", `GCall ("listup", `Var "a", []), []), []);
   ] in
   let a = [4; 1; -2; 5; -3; 3; 0; -1; -4; 6; -5; 2] in
-  let a = a @ (List.map (fun n -> n - 1) a) @ (List.map (fun n -> n + 1) a) in
-  let mult = make_int 100 in
+  let a =
+    a @ (List.map (fun n -> n - 1) a) @ (List.map (fun n -> n + 1) a)
+  in
+  let mult = make_int 10 in
   make_program fdefs gdefs (`FCall ("sort", [make_list (
     List.map (fun n -> `GCall ("mul", make_int n, [mult])) a)]))
