@@ -81,6 +81,13 @@ let program =
     "cnd"  $ ("T" +> [], ["t0"; "f0"]) => `Var "t0";
     "cnd"  $ ("F" +> [], ["t1"; "f1"]) => `Var "f1";
 
+    (* Dispatcher for recursion in dnn *)
+    "dnn2" $ ("T" +> [], ["x"; "y"]) => `Ctr ("Z", []);
+    "dnn2" $ ("F" +> [], ["x"; "y"]) =>
+      `Ctr ("S", [`FCall ("dnn", [
+        `FCall ("sub", [`Var "x"; `Var "y"]);
+        `Var "y"])]);
+
     (* List Operations: Merge *)
     "merge" $ ("Nil"  +> [],           ["b"]) => `Var "b";
     "merge" $ ("Cons" +> ["hd"; "tl"], ["b"]) =>
@@ -126,12 +133,8 @@ let program =
     "lss" >$ ["x"; "y"] >= `GCall ("isn", `FCall ("sub", [`Var "x"; `Var "y"]), []);
 
     (* Division for Non-Negative integers *)
-    "dnn" >$ ["x"; "y"] >= `GCall ("cnd",
-      `FCall ("lss", [`Var "x"; `Var "y"]), [
-      `Ctr ("Z", []);
-      `Ctr ("S", [`FCall ("dnn", [
-        `FCall ("sub", [`Var "x"; `Var "y"]);
-        `Var "y"])])]);
+    "dnn" >$ ["x"; "y"] >= `GCall ("dnn2",
+      `FCall ("lss", [`Var "x"; `Var "y"]), [`Var "x"; `Var "y"]);
 
     (* Division *)
     "div" >$ ["x"; "y"] >= `GCall ("mul",
@@ -147,9 +150,7 @@ let program =
     "sort" >$ ["a"] >= `GCall ("maybehead",
       `GCall ("sortiters", `GCall ("listup", `Var "a", []), []), []);
   ] in
-  let a = [4; 1; -2; 5; -3; 3; 0; -1; -4; 6; -5; 2] in
-  let a delta = List.map (fun n -> n + delta) a in
-  let a = a 0 @ a 1 @ a (-1) @ a 2 @ a (-2) in
-  let mult = make_int 10 in
-  make_program fdefs gdefs (`FCall ("sort", [make_list (
-    List.map (fun n -> `GCall ("mul", make_int n, [mult])) a)]))
+  let x = make_int 4 in
+  let y = make_int 2 in
+  let term = `FCall ("dnn", [x; y]) in
+  make_program fdefs gdefs term

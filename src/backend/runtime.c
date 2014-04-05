@@ -64,7 +64,7 @@ void sll_gc_collect() {
 }
 
 Word *sll_allocate_object(size_t object_size) {
-  //sll_gc_collect();
+  sll_gc_collect();
   Word *const cell = sll_free_cell[object_size];
   if (cell) {
     sll_free_cell[object_size] = (Word *)cell[0];
