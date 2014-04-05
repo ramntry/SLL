@@ -67,6 +67,11 @@ let program =
     "isn"  $ ("S" +> ["x"], []) => `Ctr ("F", []);
     "isn"  $ ("N" +> ["x"], []) => `Ctr ("T", []);
 
+    (* Is Zero predicate *)
+    "isz"  $ ("Z" +> [],    []) => `Ctr ("T", []);
+    "isz"  $ ("S" +> ["x"], []) => `Ctr ("F", []);
+    "isz"  $ ("N" +> ["x"], []) => `Ctr ("F", []);
+
     (* Absolute value *)
     "abs"  $ ("Z" +> [],    []) => `Ctr ("Z", []);
     "abs"  $ ("S" +> ["x"], []) => `Ctr ("S", [`Var "x"]);
@@ -124,6 +129,39 @@ let program =
         `Ctr ("Cons", [
           `GCall ("merge", `Var "hd", [`Var "hd2"]);
           `GCall ("sortiters", `Var "tl", [])]), []);
+
+    (* List Operations: Take *)
+    "takehelper" $ ("Z" +> [],    ["src"; "dst"]) => `Var "dst";
+    "takehelper" $ ("S" +> ["x"], ["src"; "dst"]) =>
+      `GCall ("maybetake", `Var "src", [`Var "x"; `Var "dst"]);
+
+    "maybetake" $ ("Cons" +> ["hd"; "tl"], ["x"; "dst"]) =>
+      `GCall ("takehelper", `Var "x", [
+        `Var "tl"; `Ctr ("Cons", [`Var "hd"; `Var "dst"])]);
+    "maybetake" $ ("Nil" +> [], ["x"; "dst"]) => `Var "dst";
+
+    (* List Operations: Len *)
+    "len" $ ("Cons" +> ["hd"; "tl"], []) =>
+      `Ctr ("S", [`GCall ("len", `Var "tl", [])]);
+    "len" $ ("Nil" +> [], []) => `Ctr ("Z", []);
+
+    (* Hailstone sequence *)
+    "hailstone2" $ ("Z" +> [], ["tail"]) =>
+      `Ctr ("Cons", [`Ctr ("S", [`Ctr ("Z", [])]); `Var "tail"]);
+    "hailstone2" $ ("S" +> ["x"], ["tail"]) =>
+      `GCall ("hailstone2",
+        `FCall ("hsnext", [`Ctr ("S", [`Var "x"])]), [
+          `Ctr ("Cons", [`Ctr ("S", [`Ctr ("S", [`Var "x"])]); `Var "tail"])]);
+
+    "hailstone" $ ("S" +> ["x"], []) =>
+      `GCall ("hailstone2", `Var "x", [`Ctr ("Nil", [])]);
+
+    "hslengths2" $ ("S" +> ["cnt"], ["x"; "lenlist"]) =>
+      `GCall ("hslengths2", `Var "cnt", [
+        `Ctr ("S", [`Var "x"]); `Ctr ("Cons", [
+          `GCall ("len", `GCall ("hailstone", `Var "x", []), []);
+          `Var "lenlist"])]);
+    "hslengths2" $ ("Z" +> [], ["x"; "lenlist"]) => `Var "lenlist";
   ] in
   let fdefs = [
     (* Subtraction *)
@@ -149,8 +187,28 @@ let program =
     (* List Operations: MergeSort *)
     "sort" >$ ["a"] >= `GCall ("maybehead",
       `GCall ("sortiters", `GCall ("listup", `Var "a", []), []), []);
+
+    (* List Operations: Take *)
+    "take" >$ ["n"; "list"] >=
+      `GCall ("takehelper", `Var "n", [`Var "list"; `Ctr ("Nil", [])]);
+
+    (* Hailstone sequence *)
+    "hsnext" >$ ["n"] >= `GCall ("cnd",
+      `GCall ("isz", `FCall ("mod", [`Var "n"; make_nat 2]), []), [
+        `GCall ("mul", `Ctr ("S", [`Var "n"]), [make_nat 3]);
+        `FCall ("dnn", [`Var "n"; make_nat 2])]);
+
+    "hslengths" >$ ["n"] >=
+      `GCall ("hslengths2", `Var "n", [make_nat 1; make_list []]);
   ] in
-  let x = make_int 4 in
-  let y = make_int 2 in
-  let term = `FCall ("dnn", [x; y]) in
+  let n = 5 in
+  let show_len = 3 in
+  let mult = 5 in
+  let hslengths =
+    `FCall ("hslengths", [`GCall ("mul", make_nat n, [make_nat mult])])
+  in
+  let sorted = `GCall ("sort", hslengths, []) in
+  let term = `FCall ("take", [
+      `GCall ("mul", make_nat show_len, [make_nat mult]); sorted])
+  in
   make_program fdefs gdefs term
