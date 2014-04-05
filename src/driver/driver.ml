@@ -1,9 +1,9 @@
 let read_file fname =
-  let in_file = open_in fname in
-  let len = in_channel_length in_file in
+  let file = open_in fname in
+  let len = in_channel_length file in
   let buf = String.create len in
-  really_input in_file buf 0 len;
-  close_in in_file;
+  really_input file buf 0 len;
+  close_in file;
   buf
 
 let c_compiler_command =
