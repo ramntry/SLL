@@ -1,14 +1,5 @@
 #include "runtime.h"
 
-static inline Word *new_cell(size_t const object_size) {
-  Word *const cell = sll_free_cell[object_size];
-  if (cell) {
-    sll_free_cell[object_size] = (Word *)cell[0];
-    return cell;
-  }
-  return sll_allocate_object(object_size);
-}
-
 static inline Object create_object_0(CtrId ctr_id) {
   Word *const cell = new_cell(0);
   cell[0] = SLL_make_header((Word)ctr_id, 0);

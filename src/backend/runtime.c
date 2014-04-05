@@ -1,13 +1,21 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "runtime.h"
 
 #define SLL_BLOCK_SIZE 2520
+#define SLL_MAX_CTR_NAME_LEN 63
 
 enum GCColor {
   SllWhite = 0,
   SllBlack = 1
+};
+
+enum Lexeme {
+  SllEof = -1,
+  SllCtrName = -2
 };
 
 struct Block {
@@ -19,6 +27,8 @@ struct RootsBlock *sll_roots;
 Word *sll_free_cell[SLL_MAX_OBJECT_SIZE];
 struct Block *sll_heap[SLL_MAX_OBJECT_SIZE];
 static size_t heap_size;
+static int next_lexeme;
+static char ctr_name_buf[SLL_MAX_CTR_NAME_LEN + 1];
 
 void sll_fatal_error(char const *message) {
   fprintf(stderr, "SLL Fatal Error: %s\n", message);
@@ -112,6 +122,82 @@ void sll_print_value(Object value, char const *const *ctr_names) {
   }
   if (size)
     printf(")");
+}
+
+static int lex_next() {
+  if (next_lexeme) {
+    int const result = next_lexeme;
+    next_lexeme = 0;
+    return result;
+  }
+  int next_char = 0;
+  do next_char = getchar();
+  while (isspace(next_char));
+  switch (next_char) {
+    case '(':
+    case ')':
+    case ',':
+      return next_char;
+    case EOF:
+      return SllEof;
+  }
+  if (!isupper(next_char))
+    sll_fatal_error("Unexpected symbol in standard input");
+  int i = 0;
+  for (; isalnum(next_char); ++i) {
+    ctr_name_buf[i] = next_char;
+    next_char = getchar();
+  }
+  ungetc(next_char, stdin);
+  ctr_name_buf[i] = 0;
+  return SllCtrName;
+}
+
+static inline int lex_look() {
+  if (next_lexeme)
+    return next_lexeme;
+  return next_lexeme = lex_next();
+}
+
+static inline void lex_take(int lexeme) {
+  if (lexeme != lex_next())
+    sll_fatal_error("Unexpected lexeme in standard input");
+}
+
+static inline int string_comp(void const *const lhs, void const *const rhs) {
+  return strcmp(*(char const *const *)lhs, *(char const *const *)rhs);
+}
+
+static Object parse_value(char const *const *ctr_names, size_t numof_ctrs) {
+  static char const *const key = ctr_name_buf;
+  lex_take(SllCtrName);
+  CtrId const ctr_id = (char const *const *)
+    bsearch(&key, ctr_names, numof_ctrs, sizeof(char *), string_comp) - ctr_names;
+  if (ctr_id >= numof_ctrs)
+    sll_fatal_error("Unexpected constructor name");
+  size_t numof_args = 0;
+  Object args[SLL_MAX_OBJECT_SIZE];
+  if (lex_look() == '(') {
+    lex_take('(');
+    if (lex_look() == SllCtrName) {
+      args[numof_args++] = parse_value(ctr_names, numof_ctrs);
+      while (lex_look() == ',') {
+        lex_take(',');
+        args[numof_args++] = parse_value(ctr_names, numof_ctrs);
+      }
+    }
+    lex_take(')');
+  }
+  Word *const cell = new_cell(numof_args);
+  cell[0] = SLL_make_header((Word)ctr_id, numof_args);
+  for (size_t i = 0; i < numof_args; ++i)
+    cell[i + 1] = (Word)args[i];
+  return cell;
+}
+
+Object sll_read_value(char const *vname, char const *const *ctr_names, size_t numof_ctrs) {
+  printf("%s = ", vname);
+  return parse_value(ctr_names, numof_ctrs);
 }
 
 void sll_finalize() {

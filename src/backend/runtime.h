@@ -36,6 +36,16 @@ extern Word *sll_free_cell[SLL_MAX_OBJECT_SIZE];
 void sll_fatal_error(char const *message);
 Word *sll_allocate_object(size_t object_size);
 void sll_print_value(Object value, char const *const *ctr_names);
+Object sll_read_value(char const *vname, char const *const *ctr_names, size_t numof_ctrs);
 void sll_finalize();
+
+static inline Word *new_cell(size_t const object_size) {
+  Word *const cell = sll_free_cell[object_size];
+  if (cell) {
+    sll_free_cell[object_size] = (Word *)cell[0];
+    return cell;
+  }
+  return sll_allocate_object(object_size);
+}
 
 #endif  // __SLL_RUNTIME_H_

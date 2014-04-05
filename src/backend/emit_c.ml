@@ -62,7 +62,9 @@ let emit_declarations { fdefs; gdefs; term; } =
   S.iter (fun cname ->
     Buffer.add_string enum ("  " ^ mangle cname ^ ",\n");
     Buffer.add_string arr ("  \"" ^ cname ^ "\",\n")) cnames;
-  Buffer.add_string enum "};\n\n";
+  let numof_cnames = S.cardinal cnames in
+  Buffer.add_string enum
+    ("  SllNumofCtrs = " ^ string_of_int numof_cnames ^ "\n};\n\n");
   Buffer.add_string arr "};\n\n";
   Buffer.add_buffer enum arr;
   Buffer.add_buffer enum decls;
