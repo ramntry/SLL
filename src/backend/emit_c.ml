@@ -8,8 +8,10 @@ let emit_prolog _ =
 let emit_epilog _ =
   "#include \"module_epilog.c\""
 
-let mangle name =
-  name ^ "_"
+let mangle = function
+  | "create_main_term_without_io" as n -> n
+  | "sll_read_value" as n -> n
+  | n ->  n ^ "_"
 
 let emit_app name args =
   name ^ "(" ^ (String.concat ", " args) ^ ")"
@@ -117,7 +119,7 @@ let emit_val_def indent vname aname args =
     ^ emit_app aname args ^ ";\n"
 
 let rec emit_expr indent buf env = function
-  | `Var name -> List.assoc name env
+  | `Var name -> begin try List.assoc name env with Not_found -> name end
   | `Ctr (cname, exprs) ->
       let vname = Names.ctr cname in
       let numof_args = List.length exprs in
@@ -184,8 +186,28 @@ let emit_gdef gname gpdefs =
   Buffer.add_buffer header buf;
   Buffer.contents header
 
+let free_vars term =
+  let rec helper acc = function
+    | `Var vname -> vname :: acc
+    | `Ctr (_, args) | `FCall (_, args) ->
+        List.fold_left helper acc args
+    | `GCall (_, parg, args) ->
+        List.fold_left helper (helper acc parg) args
+  in
+  List.rev (helper [] term)
+
 let emit_main { term; _ } =
-  emit_fdef "create_main_term" { fargs = []; fbody = term; }
+  let fvars = free_vars term in
+  let main_term_args = List.map (fun var ->
+    `FCall ("sll_read_value", [
+      `Var ("\"" ^ var ^ "\""); `Var "constructor_names"; `Var "SllNumofCtrs"]))
+    fvars
+  in
+  emit_fdef "create_main_term_without_io"
+    { fargs = fvars; fbody = term; }
+  ^ emit_fdef "create_main_term"
+      { fargs = [];
+        fbody = `FCall ("create_main_term_without_io", main_term_args); }
 
 let emit_defs defs emitter =
   let buf = Buffer.create 16 in

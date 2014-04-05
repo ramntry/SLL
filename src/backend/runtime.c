@@ -178,14 +178,18 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int s
   if (ctr_id >= numof_ctrs)
     sll_fatal_error("Unexpected constructor name");
   size_t numof_args = 0;
-  Object args[SLL_MAX_OBJECT_SIZE];
+  struct {
+    struct RootsBlock header;
+    Object args[SLL_MAX_OBJECT_SIZE];
+  } m = { { sll_roots, SLL_MAX_OBJECT_SIZE } };
+  sll_roots = &m.header;
   if (lex_look(skip_newline) == '(') {
     lex_take('(');
     if (lex_look(1) == SllCtrName) {
-      args[numof_args++] = parse_value(ctr_names, numof_ctrs, 1);
+      m.args[numof_args++] = parse_value(ctr_names, numof_ctrs, 1);
       while (lex_look(1) == ',') {
         lex_take(',');
-        args[numof_args++] = parse_value(ctr_names, numof_ctrs, 1);
+        m.args[numof_args++] = parse_value(ctr_names, numof_ctrs, 1);
       }
     }
     lex_take(')');
@@ -193,7 +197,8 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int s
   Word *const cell = new_cell(numof_args);
   cell[0] = SLL_make_header((Word)ctr_id, numof_args);
   for (size_t i = 0; i < numof_args; ++i)
-    cell[i + 1] = (Word)args[i];
+    cell[i + 1] = (Word)m.args[i];
+  sll_roots = m.header.next;
   return cell;
 }
 
