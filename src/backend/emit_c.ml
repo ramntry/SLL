@@ -57,7 +57,7 @@ let emit_declarations { fdefs; gdefs; term; } =
     Ident_map.fold (fun gname gpdefs a ->
       Buffer.add_string decls (emit_gdecl (mangle gname) gpdefs ^ ";\n");
       S.union a (Ident_map.fold (fun pname { gbody; _ } b ->
-        S.union b (cnames_of_expr gbody)) gpdefs S.empty))
+        S.union (S.add pname b) (cnames_of_expr gbody)) gpdefs S.empty))
       gdefs cnames_of_fdefs
   in
   let cnames = S.union cnames_of_defs (cnames_of_expr term) in
