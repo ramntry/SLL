@@ -66,4 +66,4 @@ sup(Z, y) = N(y)
 takehelper(S(x), src, dst) = maybetake(src, x, dst)
 takehelper(Z, src, dst) = dst
 .
-take(mul(S(S(S(Z))), S(S(S(S(S(Z)))))), sort(hslengths(mul(S(S(S(S(S(Z))))), S(S(S(S(S(Z)))))))))
+take(mul(S(S(S(Z))), S(S(S(S(S(Z)))))), sort(hslengths(mul(S(S(S(S(orderOfMagnitude)))), S(S(S(S(S(Z)))))))))
