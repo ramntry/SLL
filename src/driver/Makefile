@@ -30,7 +30,6 @@ all:
 	make -C ../backend
 	make -C ../parser
 	make driver
-	make test
 
 driver: driver.cmx
 	${CAMLC} ${INCLUDE} ${CAMLD_FLAGS} ${LIBS} $^ -o $@
