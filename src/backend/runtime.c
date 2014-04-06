@@ -14,7 +14,7 @@ enum GCColor {
 };
 
 enum Lexeme {
-  SllEof = -1,
+  SllEof     = -1,
   SllCtrName = -2
 };
 
@@ -23,12 +23,76 @@ struct Block {
   Word mem[SLL_BLOCK_SIZE];
 };
 
+struct ExternalCtrNamesTable {
+  char const **hash_table;
+  size_t mask;
+  size_t size;
+};
+
 struct RootsBlock *sll_roots;
 Word *sll_free_cell[SLL_MAX_OBJECT_SIZE];
 struct Block *sll_heap[SLL_MAX_OBJECT_SIZE];
 static size_t heap_size;
 static int next_lexeme;
 static char ctr_name_buf[SLL_MAX_CTR_NAME_LEN + 1];
+static struct ExternalCtrNamesTable ext_ctr_names;
+
+static void dump_ext_ctr_names() {
+  for (size_t i = 0; i <= ext_ctr_names.mask; ++i)
+    printf("\n[%4zu] %s", i, ext_ctr_names.hash_table[i]);
+}
+
+static void init_ext_ctr_names(size_t const capacity_mask) {
+  ext_ctr_names.mask = capacity_mask;
+  size_t const capacity_in_bytes = sizeof(char *) * (ext_ctr_names.mask + 1);
+  ext_ctr_names.hash_table = (char const **)malloc(capacity_in_bytes);
+  memset(ext_ctr_names.hash_table, 0, capacity_in_bytes);
+}
+
+static void dispose_ext_ctr_names() {
+  for (size_t i = 0; i <= ext_ctr_names.mask; ++i)
+    if (ext_ctr_names.hash_table[i])
+      free((void *)ext_ctr_names.hash_table[i]);
+  free(ext_ctr_names.hash_table);
+}
+
+static inline size_t str_hash(char const *str) {
+  size_t acc = 0;
+  while (*str)
+    acc = acc * 241 + *str++;
+  return acc;
+}
+
+static void rehash_ext_ctr_names() {
+  size_t const old_mask = ext_ctr_names.mask;
+  char const **old_table = ext_ctr_names.hash_table;
+  init_ext_ctr_names((old_mask << 1) | 1);
+  for (size_t j = 0; j <= old_mask; ++j)
+    if (old_table[j]) {
+      size_t i = str_hash(old_table[j]) & ext_ctr_names.mask;
+      while (ext_ctr_names.hash_table[i])
+        i = (i + 1) & ext_ctr_names.mask;
+      ext_ctr_names.hash_table[i] = old_table[j];
+    }
+  free(old_table);
+}
+
+static char const *get_ext_ctr_name() {
+  for (size_t i = str_hash(ctr_name_buf);; ++i) {
+    i &= ext_ctr_names.mask;
+    char const *const curr_str = ext_ctr_names.hash_table[i];
+    if (!curr_str) {
+      char *const new_str = (char *)malloc(strlen(ctr_name_buf) + 1);
+      strcpy(new_str, ctr_name_buf);
+      ext_ctr_names.hash_table[i] = new_str;
+      if (++ext_ctr_names.size > ext_ctr_names.mask / 4)
+        rehash_ext_ctr_names();
+      return new_str;
+    }
+    if (strcmp(curr_str, ctr_name_buf) == 0)
+      return curr_str;
+  }
+}
 
 void sll_fatal_error(char const *message) {
   fprintf(stderr, "SLL Fatal Error: %s\n", message);
@@ -175,6 +239,7 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int s
   lex_take(SllCtrName);
   CtrId const ctr_id = (char const *const *)
     bsearch(&key, ctr_names, numof_ctrs, sizeof(char *), string_comp) - ctr_names;
+  printf("[[%s]]\n", get_ext_ctr_name());
   if (ctr_id >= numof_ctrs)
     sll_fatal_error("Unexpected constructor name");
   size_t numof_args = 0;
@@ -207,7 +272,12 @@ Object sll_read_value(char const *vname, char const *const *ctr_names, size_t nu
   return parse_value(ctr_names, numof_ctrs, 0);
 }
 
+void sll_initialize() {
+  init_ext_ctr_names(0x7);
+}
+
 void sll_finalize() {
+  dispose_ext_ctr_names();
   for (size_t i = 0; i < SLL_MAX_OBJECT_SIZE; ++i) {
     struct Block *curr_block = sll_heap[i];
     while (curr_block) {

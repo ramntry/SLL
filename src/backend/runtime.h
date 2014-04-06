@@ -37,6 +37,7 @@ void sll_fatal_error(char const *message);
 Word *sll_allocate_object(size_t object_size);
 void sll_print_value(Object value, char const *const *ctr_names);
 Object sll_read_value(char const *vname, char const *const *ctr_names, size_t numof_ctrs);
+void sll_initialize();
 void sll_finalize();
 
 static inline Word *new_cell(size_t const object_size) {
