@@ -8,7 +8,7 @@
 
 typedef uintptr_t Word;
 typedef Word *Object;
-typedef Word const CtrId;
+typedef Word CtrId;
 
 #define SLL_make_header(ctr_id, object_size) \
   (((object_size) << 18) | (((ctr_id) & 0xFFFFU) << 2))
@@ -37,6 +37,7 @@ void sll_fatal_error(char const *message);
 Word *sll_allocate_object(size_t object_size);
 void sll_print_value(Object value, char const *const *ctr_names);
 Object sll_read_value(char const *vname, char const *const *ctr_names, size_t numof_ctrs);
+void sll_initialize();
 void sll_finalize();
 
 static inline Word *new_cell(size_t const object_size) {
