@@ -14,13 +14,23 @@ enum GCColor {
 };
 
 enum Lexeme {
-  SllEof = -1,
+  SllEof     = -1,
   SllCtrName = -2
+};
+
+enum BuiltinCtrIds {
+  SllExternalCtrId = 0xFFFF
 };
 
 struct Block {
   struct Block *next;
   Word mem[SLL_BLOCK_SIZE];
+};
+
+struct ExternalCtrNamesTable {
+  char const **hash_table;
+  size_t mask;
+  size_t size;
 };
 
 struct RootsBlock *sll_roots;
@@ -29,6 +39,59 @@ struct Block *sll_heap[SLL_MAX_OBJECT_SIZE];
 static size_t heap_size;
 static int next_lexeme;
 static char ctr_name_buf[SLL_MAX_CTR_NAME_LEN + 1];
+static struct ExternalCtrNamesTable ext_ctr_names;
+
+static void init_ext_ctr_names(size_t const capacity_mask) {
+  ext_ctr_names.mask = capacity_mask;
+  size_t const capacity_in_bytes = sizeof(char *) * (ext_ctr_names.mask + 1);
+  ext_ctr_names.hash_table = (char const **)malloc(capacity_in_bytes);
+  memset(ext_ctr_names.hash_table, 0, capacity_in_bytes);
+}
+
+static void dispose_ext_ctr_names() {
+  for (size_t i = 0; i <= ext_ctr_names.mask; ++i)
+    if (ext_ctr_names.hash_table[i])
+      free((void *)ext_ctr_names.hash_table[i]);
+  free(ext_ctr_names.hash_table);
+}
+
+static inline size_t str_hash(char const *str) {
+  size_t acc = 0;
+  while (*str)
+    acc = (acc + *str++) * 241;
+  return acc;
+}
+
+static void rehash_ext_ctr_names() {
+  size_t const old_mask = ext_ctr_names.mask;
+  char const **old_table = ext_ctr_names.hash_table;
+  init_ext_ctr_names((old_mask << 1) | 1);
+  for (size_t j = 0; j <= old_mask; ++j)
+    if (old_table[j]) {
+      size_t i = str_hash(old_table[j]) & ext_ctr_names.mask;
+      while (ext_ctr_names.hash_table[i])
+        i = (i + 1) & ext_ctr_names.mask;
+      ext_ctr_names.hash_table[i] = old_table[j];
+    }
+  free(old_table);
+}
+
+static char const *get_ext_ctr_name() {
+  for (size_t i = str_hash(ctr_name_buf);; ++i) {
+    i &= ext_ctr_names.mask;
+    char const *const curr_str = ext_ctr_names.hash_table[i];
+    if (!curr_str) {
+      char *const new_str = (char *)malloc(strlen(ctr_name_buf) + 1);
+      strcpy(new_str, ctr_name_buf);
+      ext_ctr_names.hash_table[i] = new_str;
+      if (++ext_ctr_names.size > ext_ctr_names.mask / 4)
+        rehash_ext_ctr_names();
+      return new_str;
+    }
+    if (strcmp(curr_str, ctr_name_buf) == 0)
+      return curr_str;
+  }
+}
 
 void sll_fatal_error(char const *message) {
   fprintf(stderr, "SLL Fatal Error: %s\n", message);
@@ -112,7 +175,10 @@ Word *sll_allocate_object(size_t object_size) {
 void sll_print_value(Object value, char const *const *ctr_names) {
   CtrId const ctr_id = SLL_get_ctr_id(value[0]);
   size_t const size = SLL_get_osize(value[0]);
-  printf("%s", ctr_names[ctr_id]);
+  if (ctr_id == SllExternalCtrId)
+    printf("%s", (char const *)value[size + 1]);
+  else
+    printf("%s", ctr_names[ctr_id]);
   if (size)
     printf("(");
   for (size_t i = 1; i <= size; ++i) {
@@ -173,10 +239,15 @@ static inline int string_comp(void const *const lhs, void const *const rhs) {
 static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int skip_newline) {
   static char const *const key = ctr_name_buf;
   lex_take(SllCtrName);
-  CtrId const ctr_id = (char const *const *)
-    bsearch(&key, ctr_names, numof_ctrs, sizeof(char *), string_comp) - ctr_names;
-  if (ctr_id >= numof_ctrs)
-    sll_fatal_error("Unexpected constructor name");
+  char const *const *ctr_name_found = (char const *const *)
+      bsearch(&key, ctr_names, numof_ctrs, sizeof(char *), string_comp);
+  CtrId ctr_id = SllExternalCtrId;
+  char const *ext_ctr_name = NULL;
+  if (ctr_name_found)
+    ctr_id = ctr_name_found - ctr_names;
+  else
+    ext_ctr_name = get_ext_ctr_name();
+
   size_t numof_args = 0;
   struct {
     struct RootsBlock header;
@@ -194,10 +265,12 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int s
     }
     lex_take(')');
   }
-  Word *const cell = new_cell(numof_args);
+  Word *const cell = new_cell(numof_args + (ctr_id == SllExternalCtrId));
   cell[0] = SLL_make_header((Word)ctr_id, numof_args);
   for (size_t i = 0; i < numof_args; ++i)
     cell[i + 1] = (Word)m.args[i];
+  if (ctr_id == SllExternalCtrId)
+    cell[numof_args + 1] = (Word)ext_ctr_name;
   sll_roots = m.header.next;
   return cell;
 }
@@ -208,7 +281,12 @@ Object sll_read_value(char const *vname, char const *const *ctr_names, size_t nu
   return parse_value(ctr_names, numof_ctrs, 0);
 }
 
+void sll_initialize() {
+  init_ext_ctr_names(0x7);
+}
+
 void sll_finalize() {
+  dispose_ext_ctr_names();
   for (size_t i = 0; i < SLL_MAX_OBJECT_SIZE; ++i) {
     struct Block *curr_block = sll_heap[i];
     while (curr_block) {
