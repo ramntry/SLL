@@ -8,7 +8,7 @@
 
 typedef uintptr_t Word;
 typedef Word *Object;
-typedef Word const CtrId;
+typedef Word CtrId;
 
 #define SLL_make_header(ctr_id, object_size) \
   (((object_size) << 18) | (((ctr_id) & 0xFFFFU) << 2))

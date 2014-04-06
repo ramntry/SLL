@@ -18,6 +18,10 @@ enum Lexeme {
   SllCtrName = -2
 };
 
+enum BuiltinCtrIds {
+  SllExternalCtrId = 0xFFFF
+};
+
 struct Block {
   struct Block *next;
   Word mem[SLL_BLOCK_SIZE];
@@ -36,11 +40,6 @@ static size_t heap_size;
 static int next_lexeme;
 static char ctr_name_buf[SLL_MAX_CTR_NAME_LEN + 1];
 static struct ExternalCtrNamesTable ext_ctr_names;
-
-static void dump_ext_ctr_names() {
-  for (size_t i = 0; i <= ext_ctr_names.mask; ++i)
-    printf("\n[%4zu] %s", i, ext_ctr_names.hash_table[i]);
-}
 
 static void init_ext_ctr_names(size_t const capacity_mask) {
   ext_ctr_names.mask = capacity_mask;
@@ -176,7 +175,10 @@ Word *sll_allocate_object(size_t object_size) {
 void sll_print_value(Object value, char const *const *ctr_names) {
   CtrId const ctr_id = SLL_get_ctr_id(value[0]);
   size_t const size = SLL_get_osize(value[0]);
-  printf("%s", ctr_names[ctr_id]);
+  if (ctr_id == SllExternalCtrId)
+    printf("%s", (char const *)value[size + 1]);
+  else
+    printf("%s", ctr_names[ctr_id]);
   if (size)
     printf("(");
   for (size_t i = 1; i <= size; ++i) {
@@ -237,11 +239,15 @@ static inline int string_comp(void const *const lhs, void const *const rhs) {
 static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int skip_newline) {
   static char const *const key = ctr_name_buf;
   lex_take(SllCtrName);
-  CtrId const ctr_id = (char const *const *)
-    bsearch(&key, ctr_names, numof_ctrs, sizeof(char *), string_comp) - ctr_names;
-  printf("[[%s]]\n", get_ext_ctr_name());
-  if (ctr_id >= numof_ctrs)
-    sll_fatal_error("Unexpected constructor name");
+  char const *const *ctr_name_found = (char const *const *)
+      bsearch(&key, ctr_names, numof_ctrs, sizeof(char *), string_comp);
+  CtrId ctr_id = SllExternalCtrId;
+  char const *ext_ctr_name = NULL;
+  if (ctr_name_found)
+    ctr_id = ctr_name_found - ctr_names;
+  else
+    ext_ctr_name = get_ext_ctr_name();
+
   size_t numof_args = 0;
   struct {
     struct RootsBlock header;
@@ -259,10 +265,12 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int s
     }
     lex_take(')');
   }
-  Word *const cell = new_cell(numof_args);
+  Word *const cell = new_cell(numof_args + (ctr_id == SllExternalCtrId));
   cell[0] = SLL_make_header((Word)ctr_id, numof_args);
   for (size_t i = 0; i < numof_args; ++i)
     cell[i + 1] = (Word)m.args[i];
+  if (ctr_id == SllExternalCtrId)
+    cell[numof_args + 1] = (Word)ext_ctr_name;
   sll_roots = m.header.next;
   return cell;
 }

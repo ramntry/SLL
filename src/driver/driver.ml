@@ -7,7 +7,7 @@ let read_file fname =
   buf
 
 let c_compiler_command =
-  "gcc -std=c99 -x c -g -I ../backend ../backend/runtime.c -o a.out -"
+  "gcc -std=c99 -x c -O2 -I ../backend ../backend/runtime.c -o a.out -"
 
 let compile fname =
   let gen program =
