@@ -204,6 +204,7 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int s
 
 Object sll_read_value(char const *vname, char const *const *ctr_names, size_t numof_ctrs) {
   printf("%s = ", vname);
+  next_lexeme = 0;
   return parse_value(ctr_names, numof_ctrs, 0);
 }
 
