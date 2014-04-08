@@ -1,1 +1,1 @@
-val emit : Sll.pure Sll.program -> string
+val emit : strict:bool -> Sll.pure Sll.program -> string
