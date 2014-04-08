@@ -17,7 +17,7 @@ let emit_app name args =
   name ^ "(" ^ (String.concat ", " args) ^ ")"
 
 let emit_decl name args =
-  let typed_args = List.map (fun n -> "Object " ^ n) args in
+  let typed_args = List.map (fun n -> "Object const " ^ n) args in
   "Object " ^ emit_app name typed_args
 
 let emit_fdecl fname fargs =
@@ -118,62 +118,77 @@ let emit_val_def indent vname aname args =
   String.make indent ' ' ^ vname ^ " = "
     ^ emit_app aname args ^ ";\n"
 
-let rec emit_expr indent buf env = function
+let rec emit_expr ~strict indent buf env = function
   | `Var name -> begin try List.assoc name env with Not_found -> name end
   | `Ctr (cname, exprs) ->
       let vname = Names.ctr cname in
-      let numof_args = List.length exprs in
-      let aname = "create_object_" ^ (string_of_int numof_args) in
-      let args = List.map (fun e -> emit_expr indent buf env e) exprs in
+      let numof_args = string_of_int (List.length exprs) in
+      let aname = "create_object_" ^ numof_args in
+      let args = List.map (fun e -> emit_expr ~strict indent buf env e) exprs in
       let val_def = emit_val_def indent vname aname (mangle cname :: args) in
       Buffer.add_string buf val_def;
       vname
   | `FCall (fname, exprs) ->
       let vname = Names.fcall fname in
-      let args = List.map (fun e -> emit_expr indent buf env e) exprs in
-      let val_def = emit_val_def indent vname (mangle fname) args in
+      let numof_args = string_of_int (List.length exprs) in
+      let args = List.map (fun e -> emit_expr ~strict indent buf env e) exprs in
+      let (aname, args) = if strict
+        then (mangle fname, args)
+        else ("create_thunk_" ^ numof_args, ("&" ^ mangle fname) :: args)
+      in
+      let val_def = emit_val_def indent vname aname args in
       Buffer.add_string buf val_def;
       vname
   | `GCall (gname, ctr, exprs) ->
       let vname = Names.gcall gname in
-      let ctrval = emit_expr indent buf env ctr in
-      let args = List.map (fun e -> emit_expr indent buf env e) exprs in
-      let val_def = emit_val_def indent vname (mangle gname) (ctrval :: args) in
+      let numof_args = string_of_int (List.length exprs + 1) in
+      let ctrval = emit_expr ~strict indent buf env ctr in
+      let args = ctrval :: List.map (fun e ->
+          emit_expr ~strict indent buf env e) exprs
+      in
+      let (aname, args) = if strict
+        then (mangle gname, args)
+        else ("create_thunk_" ^ numof_args, ("&" ^ mangle gname) :: args)
+      in
+      let val_def = emit_val_def indent vname aname args in
       Buffer.add_string buf val_def;
       vname
 
-let emit_fdef fname { fargs; fbody; } =
+let emit_fdef ~strict fname { fargs; fbody; } =
   Names.reset ();
   let buf = Buffer.create 16 in
   let header = Buffer.create 16 in
   Buffer.add_string header (emit_fdecl fname fargs ^ " {\n");
   let env = List.combine fargs (List.map mangle fargs) in
-  let result = emit_expr 2 buf env fbody in
+  let result = emit_expr ~strict 2 buf env fbody in
   Buffer.add_string buf ("  sll_roots = m.header.next;\n"
     ^ "  return " ^ result ^ ";\n}\n\n");
   Names.emit header;
   Buffer.add_buffer header buf;
   Buffer.contents header
 
-let emit_gdef gname gpdefs =
+let emit_gdef ~strict gname gpdefs =
   Names.reset ();
   let buf = Buffer.create 16 in
   let header = Buffer.create 16 in
   let canonical_args = canonical_gargs gpdefs in
+  let ctr = if strict then "ctr" else Names.ctr "" in
   let emit_case pname pargs gargs gbody =
     let penv = List.mapi (fun i arg ->
-      (arg, "(Object)ctr[" ^ string_of_int (i + 1) ^ "]")) pargs
+      (arg, "(Object)" ^ ctr ^ "[" ^ string_of_int (i + 1) ^ "]")) pargs
     in
     let genv = List.combine gargs canonical_args in
     Buffer.add_string buf ("case " ^ mangle pname ^ ": {\n");
-    let result = emit_expr 6 buf (penv @ genv) gbody in
+    let result = emit_expr ~strict 6 buf (penv @ genv) gbody in
     Buffer.add_string buf ("      result = " ^ result ^ ";\n"
       ^ "      break;\n"
       ^ "  } ")
   in
   Buffer.add_string header (emit_gdecl gname gpdefs ^ " {\n");
+  if not strict then
+    Buffer.add_string buf ("  " ^ ctr ^ " = head_form(ctr);\n");
   Buffer.add_string buf ("  Object result = NULL;\n"
-    ^ "  switch (SLL_get_ctr_id(ctr[0])) {\n"
+    ^ "  switch (SLL_get_ctr_id(" ^ ctr ^ "[0])) {\n"
     ^ "    ");
   Ident_map.iter (fun pname { pargs; gargs; gbody; } ->
     emit_case pname pargs gargs gbody) gpdefs;
@@ -196,37 +211,37 @@ let free_vars term =
   in
   List.rev (helper [] term)
 
-let emit_main { term; _ } =
+let emit_main ~strict { term; _ } =
   let fvars = free_vars term in
   let main_term_args = List.map (fun var ->
     `FCall ("sll_read_value", [
       `Var ("\"" ^ var ^ "\""); `Var "constructor_names"; `Var "SllNumofCtrs"]))
     fvars
   in
-  emit_fdef "create_main_term_without_io"
+  emit_fdef ~strict "create_main_term_without_io"
     { fargs = fvars; fbody = term; }
-  ^ emit_fdef "create_main_term"
+  ^ emit_fdef ~strict:true "create_main_term"
       { fargs = [];
         fbody = `FCall ("create_main_term_without_io", main_term_args); }
 
-let emit_defs defs emitter =
+let emit_defs ~strict defs emitter =
   let buf = Buffer.create 16 in
   Ident_map.iter (fun name def ->
-    Buffer.add_string buf (emitter (mangle name) def)) defs;
+    Buffer.add_string buf (emitter ~strict (mangle name) def)) defs;
   Buffer.contents buf
 
-let emit_fdefs { fdefs; _ } = emit_defs fdefs emit_fdef
-let emit_gdefs { gdefs; _ } = emit_defs gdefs emit_gdef
+let emit_fdefs ~strict { fdefs; _ } = emit_defs ~strict fdefs emit_fdef
+let emit_gdefs ~strict { gdefs; _ } = emit_defs ~strict gdefs emit_gdef
 
-let emit ({ fdefs; gdefs; term; } as p) =
+let emit ~strict ({ fdefs; gdefs; term; } as p) =
   let buffer = Buffer.create 16 in
   List.iter (fun emitter ->
     Buffer.add_string buffer (emitter p))
     [ emit_prolog;
       emit_declarations;
-      emit_gdefs;
-      emit_fdefs;
-      emit_main;
+      emit_gdefs ~strict;
+      emit_fdefs ~strict;
+      emit_main ~strict;
       emit_epilog
     ];
   Buffer.contents buffer

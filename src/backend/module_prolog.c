@@ -51,3 +51,79 @@ CREATE_OBJECT_DEF(12)
 CREATE_OBJECT_DEF(13)
 CREATE_OBJECT_DEF(14)
 CREATE_OBJECT_DEF(15)
+
+typedef Object (*Function0)();
+typedef Object (*Function1)(Object const _1);
+typedef Object (*Function2)(Object const _1, Object const _2);
+typedef Object (*Function3)(Object const _1, Object const _2, Object const _3);
+typedef Object (*Function4)(Object const _1, Object const _2, Object const _3, Object const _4);
+
+static Object apply_thunk_0(Object const thunk) {
+  return ((Function0)thunk[1])();
+}
+
+static Object apply_thunk_1(Object const thunk) {
+  return ((Function1)thunk[2])((Object)thunk[1]);
+}
+
+static Object apply_thunk_2(Object const thunk) {
+  return ((Function2)thunk[3])((Object)thunk[1], (Object)thunk[2]);
+}
+
+static Object apply_thunk_3(Object const thunk) {
+  return ((Function3)thunk[4])((Object)thunk[1], (Object)thunk[2], (Object)thunk[3]);
+}
+
+static Object apply_thunk_4(Object const thunk) {
+  return ((Function4)thunk[5])((Object)thunk[1], (Object)thunk[2], (Object)thunk[3], (Object)thunk[4]);
+}
+
+static inline Object create_thunk_0(Function0 const func) {
+  Word *const cell = new_cell(2);
+  cell[0] = SLL_make_header((Word)SllThunkId, 0);
+  cell[1] = (Word)func;
+  cell[2] = (Word)&apply_thunk_0;
+  return cell;
+}
+
+static inline Object create_thunk_1(Function1 const func, Object const _1) {
+  Word *const cell = new_cell(3);
+  cell[0] = SLL_make_header((Word)SllThunkId, 1);
+  cell[1] = (Word)_1;
+  cell[2] = (Word)func;
+  cell[3] = (Word)&apply_thunk_1;
+  return cell;
+}
+
+static inline Object create_thunk_2(Function2 const func, Object const _1, Object const _2) {
+  Word *const cell = new_cell(4);
+  cell[0] = SLL_make_header((Word)SllThunkId, 2);
+  cell[1] = (Word)_1;
+  cell[2] = (Word)_2;
+  cell[3] = (Word)func;
+  cell[4] = (Word)&apply_thunk_2;
+  return cell;
+}
+
+static inline Object create_thunk_3(Function3 const func, Object const _1, Object const _2, Object const _3) {
+  Word *const cell = new_cell(5);
+  cell[0] = SLL_make_header((Word)SllThunkId, 3);
+  cell[1] = (Word)_1;
+  cell[2] = (Word)_2;
+  cell[3] = (Word)_3;
+  cell[4] = (Word)func;
+  cell[5] = (Word)&apply_thunk_3;
+  return cell;
+}
+
+static inline Object create_thunk_4(Function4 const func, Object const _1, Object const _2, Object const _3, Object const _4) {
+  Word *const cell = new_cell(6);
+  cell[0] = SLL_make_header((Word)SllThunkId, 4);
+  cell[1] = (Word)_1;
+  cell[2] = (Word)_2;
+  cell[3] = (Word)_3;
+  cell[4] = (Word)_4;
+  cell[5] = (Word)func;
+  cell[6] = (Word)&apply_thunk_4;
+  return cell;
+}

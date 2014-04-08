@@ -18,10 +18,6 @@ enum Lexeme {
   SllCtrName = -2
 };
 
-enum BuiltinCtrIds {
-  SllExternalCtrId = 0xFFFF
-};
-
 struct Block {
   struct Block *next;
   Word mem[SLL_BLOCK_SIZE];
@@ -171,11 +167,17 @@ Word *sll_allocate_object(size_t object_size) {
   return &new_block->mem[0];
 }
 
-void sll_print_value(Object value, char const *const *ctr_names) {
-  CtrId const ctr_id = SLL_get_ctr_id(value[0]);
-  size_t const size = SLL_get_osize(value[0]);
+void sll_print_value(Object const value, char const *const *ctr_names) {
+  struct {
+    struct RootsBlock header;
+    Object value;
+  } m = { { sll_roots, 1 }, value };
+  sll_roots = &m.header;
+  m.value = head_form(m.value);
+  CtrId const ctr_id = SLL_get_ctr_id(m.value[0]);
+  size_t const size = SLL_get_osize(m.value[0]);
   if (ctr_id == SllExternalCtrId)
-    printf("%s", (char const *)value[size + 1]);
+    printf("%s", (char const *)m.value[size + 1]);
   else
     printf("%s", ctr_names[ctr_id]);
   if (size)
@@ -183,10 +185,11 @@ void sll_print_value(Object value, char const *const *ctr_names) {
   for (size_t i = 1; i <= size; ++i) {
     if (i > 1)
       printf(", ");
-    sll_print_value((Object)value[i], ctr_names);
+    sll_print_value((Object)m.value[i], ctr_names);
   }
   if (size)
     printf(")");
+  sll_roots = m.header.next;
 }
 
 static int lex_next(int skip_newline) {
