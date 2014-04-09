@@ -173,7 +173,7 @@ void sll_print_value(Object const value, char const *const *ctr_names) {
     Object value;
   } m = { { sll_roots, 1 }, value };
   sll_roots = &m.header;
-  m.value = head_form(m.value);
+  m.value = HEAD_FORM(m.value);
   CtrId const ctr_id = SLL_get_ctr_id(m.value[0]);
   size_t const size = SLL_get_osize(m.value[0]);
   if (ctr_id == SllExternalCtrId)

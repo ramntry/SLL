@@ -186,7 +186,7 @@ let emit_gdef ~strict gname gpdefs =
   in
   Buffer.add_string header (emit_gdecl gname gpdefs ^ " {\n");
   if not strict then
-    Buffer.add_string buf ("  " ^ ctr ^ " = head_form(ctr);\n");
+    Buffer.add_string buf ("  " ^ ctr ^ " = HEAD_FORM(ctr);\n");
   Buffer.add_string buf ("  Object result = NULL;\n"
     ^ "  switch (SLL_get_ctr_id(" ^ ctr ^ "[0])) {\n"
     ^ "    ");
@@ -233,7 +233,7 @@ let emit_defs ~strict defs emitter =
 let emit_fdefs ~strict { fdefs; _ } = emit_defs ~strict fdefs emit_fdef
 let emit_gdefs ~strict { gdefs; _ } = emit_defs ~strict gdefs emit_gdef
 
-let emit ~strict ({ fdefs; gdefs; term; } as p) =
+let emit ?(strict = true) ({ fdefs; gdefs; term; } as p) =
   let buffer = Buffer.create 16 in
   List.iter (fun emitter ->
     Buffer.add_string buffer (emitter p))
