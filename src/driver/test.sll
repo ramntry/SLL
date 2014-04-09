@@ -65,6 +65,11 @@ sup(S(x), y) = sud(y, x)
 sup(Z, y) = N(y)
 takehelper(S(x), src, dst) = maybetake(src, x, dst)
 takehelper(Z, src, dst) = dst
+pushback(Nil, x) = Cons(x, Nil)
+pushback(Cons(hd, tl), x) = Cons(hd, pushback(tl, x))
+concat(lhs, rhs) = concatrev(rhs, lhs)
+concatrev(Nil, lhs) = lhs
+concatrev(Cons(hd, tl), lhs) = concatrev(tl, pushback(lhs, hd))
 second(x, y) = y
 forever() = forever()
 .
