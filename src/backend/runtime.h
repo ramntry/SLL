@@ -8,7 +8,8 @@
 
 enum BuiltinCtrIds {
   SllExternalCtrId = 0xFFFF,
-  SllThunkId       = 0xFFFE
+  SllThunkId       = 0xFFFE,
+  SllCachedThunkId = 0xFFFD
 };
 
 typedef uintptr_t Word;
@@ -16,19 +17,19 @@ typedef Word *Object;
 typedef Word CtrId;
 
 #define SLL_make_header(ctr_id, object_size) \
-  (((object_size) << 18) | (((ctr_id) & 0xFFFFU) << 2))
+  (((object_size) << 18) | (((ctr_id) & 0xFFFFUL) << 2))
 
 #define SLL_get_ctr_id(header) \
-  ((CtrId)(((header) >> 2) & 0xFFFFU))
+  ((CtrId)(((header) >> 2) & 0xFFFFUL))
 
 #define SLL_get_osize(header) \
   ((size_t)((header) >> 18))
 
 #define SLL_get_color(header) \
-  ((unsigned char)((header) & 0x3U))
+  ((unsigned char)((header) & 0x3UL))
 
 #define SLL_set_color(header, color) \
-   ((header) | (((color) & 0x3U)))
+   (((header) & ~0x3UL) | (((color) & 0x3UL)))
 
 struct RootsBlock {
   struct RootsBlock *const next;
