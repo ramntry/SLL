@@ -74,4 +74,4 @@ octa(x) = Octa(x, x, x, x, x, x, x, x)
 second(x, y) = y
 forever() = forever()
 .
-octa(concat(lhsList, rhsList))
+take(mul(S(S(S(Z))), S(S(S(S(S(Z)))))), sort(hslengths(mul(S(S(orderOfMagnitude)), S(S(S(S(S(Z)))))))))
