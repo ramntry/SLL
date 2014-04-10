@@ -1,7 +1,7 @@
 open Emit_c
 
 let c_compiler = ref "gcc"
-let c_compiler_args = ref "-x c -std=c99 -pedantic -Wall"
+let c_compiler_args = ref "-x c -std=c99 -Wall"
 let trailing_c_compiler_args = ref ""
 
 let evalstrat = ref Byneed
