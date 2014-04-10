@@ -119,7 +119,13 @@ sed -i -e 's/right \?,/`Righta,/' -e 's/left \?,/`Lefta,/' -e 's/expr[^funx]*$/e
 make -C sample || make clean; make || die "Can not build ostap/sample. Check your screen or $logfile for details."
 ./sample/sample.opt
 
+make -C "$oops_src/driver" -B
+make -C "$oops_src/driver" install
+
 echo
+echo -------------------->
+echo "NOTE ($short_myself): compiler sllc was installed"
 echo "NOTE ($short_myself): run . setenv.sh for set environment variables (. stands for 'dot')"
+echo -------------------->
 
 cd $cwd
