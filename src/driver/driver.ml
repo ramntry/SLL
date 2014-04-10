@@ -1,3 +1,5 @@
+open Emit_c
+
 let read_file fname =
   let file = open_in fname in
   let len = in_channel_length file in
@@ -6,21 +8,33 @@ let read_file fname =
   close_in file;
   buf
 
-let c_compiler_command head_form_def =
-  "gcc -std=c99 -x c -O2 "
-  ^ head_form_def ^
-  " -I ../backend ../backend/runtime.c -o a.out -"
+let c_compiler_command evalstrat =
+  let oops_src = Sys.getenv "OOPS_SRC" in
+  let backend_dir = Filename.concat oops_src "backend" in
+  let runtime_src = Filename.concat backend_dir "runtime.c" in
+  let evalstrat_sym =
+    match evalstrat with
+    | Strict -> "SLL_STRICT"
+    | Byname -> "SLL_BYNAME"
+    | Byneed -> "SLL_BYNEED"
+  in
+  "gcc -x c -std=c99 -pedantic -Wall -O2"
+    ^ " -D" ^ evalstrat_sym
+    ^ " -I" ^ backend_dir
+    ^ " " ^ runtime_src
+    ^ " -o a.out -"
 
 let compile fname call_by_name fast_head_form =
-  let head_form_def = if call_by_name then
-    "-DSLL_HEAD_FORM="
-      ^ (if fast_head_form then "sll_fast_head_form" else "sll_head_form")
-    else ""
+  let evalstrat  =
+    match (call_by_name, fast_head_form) with
+    | (false, _)    -> Strict
+    | (true, false) -> Byname
+    | (true, true)  -> Byneed
   in
   let gen program =
-    let c_program = Emit_c.emit ~strict:(not call_by_name) program in
+    let c_program = emit ~evalstrat program in
     let c_compiler_channel =
-      Unix.open_process_out (c_compiler_command head_form_def)
+      Unix.open_process_out (c_compiler_command evalstrat)
     in
     output_string c_compiler_channel c_program;
     close_out c_compiler_channel

@@ -6,19 +6,25 @@
 
 #define SLL_MAX_OBJECT_SIZE 15
 
-#ifndef SLL_HEAD_FORM
-#define SLL_HEAD_FORM(obj) obj
+#if   defined SLL_STRICT && !defined SLL_BYNAME && !defined SLL_BYNEED
+# define SLL_HEAD_FORM(obj) obj
+#elif defined SLL_BYNAME && !defined SLL_STRICT && !defined SLL_BYNEED
+# define SLL_HEAD_FORM sll_head_form
+#elif defined SLL_BYNEED && !defined SLL_STRICT && !defined SLL_BYNAME
+# define SLL_HEAD_FORM sll_fast_head_form
+#else
+# error You must specify exactly one evaluation strategy: SLL_STRICT or SLL_BYNAME or SLL_BYNEED
 #endif
+
+typedef uintptr_t Word;
+typedef Word *Object;
+typedef Word CtrId;
 
 enum BuiltinCtrIds {
   SllExternalCtrId = 0xFFFF,
   SllThunkId       = 0xFFFE,
   SllCachedThunkId = 0xFFFD
 };
-
-typedef uintptr_t Word;
-typedef Word *Object;
-typedef Word CtrId;
 
 #define SLL_make_header(ctr_id, object_size) \
   (((object_size) << 18) | (((ctr_id) & 0xFFFFUL) << 2))

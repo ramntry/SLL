@@ -31,7 +31,9 @@ struct ExternalCtrNamesTable {
 
 struct RootsBlock *sll_roots;
 Word *sll_free_cell[SLL_MAX_OBJECT_SIZE];
+
 struct Block *sll_heap[SLL_MAX_OBJECT_SIZE];
+
 static size_t heap_size;
 static int next_lexeme;
 static char ctr_name_buf[SLL_MAX_CTR_NAME_LEN + 1];
@@ -88,31 +90,26 @@ static char const *get_ext_ctr_name() {
   }
 }
 
-void sll_fatal_error(char const *message) {
-  fprintf(stderr, "SLL Fatal Error: %s\n", message);
-  exit(EXIT_FAILURE);
-}
-
-static inline void sll_gc_dfs(Word *const cell) {
+static inline void gc_dfs(Word *const cell) {
   if (SLL_get_color(cell[0]) == SllBlack)
     return;
   cell[0] = SLL_set_color(cell[0], SllBlack);
   size_t const size = SLL_get_osize(cell[0]);
   for (size_t i = 1; i <= size; ++i)
-    sll_gc_dfs((Word *)cell[i]);
+    gc_dfs((Word *)cell[i]);
 }
 
-void sll_gc_mark() {
+static void gc_mark() {
   for (struct RootsBlock *block = sll_roots; block; block = block->next) {
     size_t const size = block->size;
     Object *objects = (Object *)(block + 1);
     for (size_t i = 0; i < size; ++i)
       if (objects[i])
-        sll_gc_dfs((Word *)objects[i]);
+        gc_dfs((Word *)objects[i]);
   }
 }
 
-size_t sll_gc_sweep() {
+static size_t gc_sweep() {
   size_t live_heap_size = 0;
   for (size_t object_size = 0; object_size < SLL_MAX_OBJECT_SIZE; ++object_size) {
     sll_free_cell[object_size] = NULL;
@@ -135,11 +132,16 @@ void sll_gc_collect() {
   static size_t max_size = 0;
   if (heap_size <= max_size)
     return;
-  sll_gc_mark();
-  size_t const live_heap_size = sll_gc_sweep();
+  gc_mark();
+  size_t const live_heap_size = gc_sweep();
   size_t const next_max_size = (live_heap_size * 3) / 2;
   if (next_max_size > max_size)
     max_size = next_max_size;
+}
+
+void sll_fatal_error(char const *message) {
+  fprintf(stderr, "SLL Fatal Error: %s\n", message);
+  exit(EXIT_FAILURE);
 }
 
 Word *sll_allocate_object(size_t object_size) {

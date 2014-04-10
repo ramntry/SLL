@@ -2,6 +2,11 @@ open Sll
 
 module Ident_map = Map.Make(String)
 
+type evalstrat =
+  | Strict
+  | Byname
+  | Byneed
+
 let emit_prolog _ =
   "#include \"module_prolog.c\"\n\n"
 
@@ -233,7 +238,8 @@ let emit_defs ~strict defs emitter =
 let emit_fdefs ~strict { fdefs; _ } = emit_defs ~strict fdefs emit_fdef
 let emit_gdefs ~strict { gdefs; _ } = emit_defs ~strict gdefs emit_gdef
 
-let emit ?(strict = true) ({ fdefs; gdefs; term; } as p) =
+let emit ~evalstrat ({ fdefs; gdefs; term; } as p) =
+  let strict = evalstrat = Strict in
   let buffer = Buffer.create 16 in
   List.iter (fun emitter ->
     Buffer.add_string buffer (emitter p))
