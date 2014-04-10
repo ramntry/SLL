@@ -123,9 +123,9 @@ make -C "$oops_src/driver" -B
 make -C "$oops_src/driver" install
 
 echo
-echo -------------------->
+echo '-------------------->'
 echo "NOTE ($short_myself): compiler sllc was installed"
 echo "NOTE ($short_myself): run . setenv.sh for set environment variables (. stands for 'dot')"
-echo -------------------->
+echo '-------------------->'
 
 cd $cwd
