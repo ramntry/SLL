@@ -30,6 +30,10 @@ let command_line_args = [
      "<file> Output binary file name",
      `DefaultVal "<derived from source file name>");
 
+  ("-g", Arg.Set with_dbg_info,
+     " Compile with debug information",
+     `DefaultOpt !with_dbg_info);
+
   ("-keep-c", Arg.Set keep_c,
      " Keep generated C source file",
      `DefaultOpt !keep_c);
@@ -46,14 +50,6 @@ let command_line_args = [
      " Compile without optimization (faster compilation, slower binary)",
      `DefaultOpt !no_opt);
 
-  ("-g", Arg.Set with_dbg_info,
-     " Compile with debug information",
-     `DefaultOpt !with_dbg_info);
-
-  ("-cc", Arg.Set_string c_compiler,
-     "<C-compiler> Use specified " ^ !c_compiler ^ " compatible C compiler",
-     `DefaultVal !c_compiler);
-
   ("-cc-args", Arg.Set_string trailing_c_compiler_args,
      "<C-compiler-args> Append some C compiler arguments \
      (for many, use quotation marks)",
@@ -62,6 +58,10 @@ let command_line_args = [
   ("-cc-over", Arg.Set_string c_compiler_args,
      "<C-compiler-args> Override not mentioned above C compiler arguments",
      `DefaultVal ("\"" ^ !c_compiler_args ^ "\""));
+
+  ("-cc", Arg.Set_string c_compiler,
+     "<C-compiler> Use specified " ^ !c_compiler ^ " compatible C compiler",
+     `DefaultVal !c_compiler);
 ]
 
 let annotate_defaults = List.map (fun (opt, act, doc, label) -> (opt, act, doc
