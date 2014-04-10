@@ -8,9 +8,9 @@ let evalstrat = ref Byneed
 let keep_c = ref false
 let only_c = ref false
 let no_opt = ref false
+let no_link = ref false
 let src_filename = ref ""
 let bin_filename = ref ""
-let object_only = ref false
 let with_dbg_info = ref false
 
 let command_line_args = [
@@ -38,9 +38,9 @@ let command_line_args = [
      " Only generate C source file",
      `DefaultOpt !only_c);
 
-  ("-c", Arg.Set object_only,
+  ("-c", Arg.Set no_link,
      " Only compile generated C source file, don't link",
-     `DefaultOpt !object_only);
+     `DefaultOpt !no_link);
 
   ("-no-opt", Arg.Set no_opt,
      " Compile without optimization (faster compilation, slower binary)",
@@ -123,7 +123,7 @@ let c_compiler_command c_src =
     ^ " -I" ^ backend_dir
     ^ " " ^ runtime_src
     ^ " " ^ c_src
-    ^ (if !object_only then " -c" else " -o " ^ bin_path)
+    ^ (if !no_link then " -c" else " -o " ^ bin_path)
     ^ " " ^ !trailing_c_compiler_args
 
 let compile () =
