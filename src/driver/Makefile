@@ -31,6 +31,10 @@ all:
 	make -C ../parser
 	make driver
 
+install:
+	mkdir -p  ../../bin/sll
+	cp driver ../../bin/sll/sllc
+
 driver: driver.cmx
 	${CAMLC} ${INCLUDE} ${CAMLD_FLAGS} ${LIBS} $^ -o $@
 

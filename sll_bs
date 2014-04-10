@@ -11,6 +11,7 @@ ocaml_major="4.01"
 ocaml_minor="0"
 ocaml_dir="ocaml-$ocaml_major.$ocaml_minor"
 ocaml_bin="$cwd/bin/$ocaml_dir"
+sll_bin="$cwd/bin/sll"
 oops_src="$cwd/src"
 ocaml_tarball="$ocaml_dir.tar.gz"
 ocaml_tarball_url="http://caml.inria.fr/pub/distrib/ocaml-$ocaml_major/$ocaml_tarball"
@@ -28,6 +29,16 @@ ostap_svn_url="$oops_svn_url/ostap/trunk"
 short_myself=$(basename $0)
 myself="$cwd/$short_myself"
 logfile="$cwd/$short_myself.log"
+
+function genenv {
+  echo "export OOPS_SRC=\"$oops_src\"" > "$cwd/setenv.sh"
+  echo "export PATH=\"$ocaml_bin/bin:$sll_bin:\$PATH\"" >> "$cwd/setenv.sh"
+}
+
+if [ "$1" == "genenv" ]; then
+  genenv
+  exit 0
+fi
 
 if [ -z "$1" ]; then
   $myself --no-log 2>&1 | tee -a "$logfile"
@@ -65,8 +76,7 @@ make -j world.opt || make clean; make world.opt || die "Can not build OCaml. Che
 make install || die "Can not install OCaml. Check disk space and your access rights."
 cd ../
 
-echo "export OOPS_SRC=\"$oops_src\"" >> "$cwd/setenv.sh"
-echo "export PATH=\"$ocaml_bin/bin:\$PATH\"" >> "$cwd/setenv.sh"
+genenv
 . "$cwd/setenv.sh"
 
 echo "##### Obtaining and building Camlp5"

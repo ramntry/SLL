@@ -1,6 +1,5 @@
 open Emit_c
 
-let sll_extension = ".sll"
 let c_compiler = ref "gcc"
 let c_compiler_args = ref "-x c -std=c99 -pedantic -Wall"
 let trailing_c_compiler_args = ref ""
@@ -99,8 +98,11 @@ let src_basename () =
   with Invalid_argument _ -> maybe_extended
 
 let c_compiler_command c_src =
-  let root_dir = Filename.dirname (Filename.dirname Sys.executable_name) in
-  let backend_dir = Filename.concat root_dir "backend" in
+  let root_dir =
+    Filename.dirname (Filename.dirname (Filename.dirname Sys.executable_name))
+  in
+  let src_dir = Filename.concat root_dir "src" in
+  let backend_dir = Filename.concat src_dir "backend" in
   let runtime_src = Filename.concat backend_dir "runtime.c" in
   let evalstrat_sym =
     match !evalstrat with
