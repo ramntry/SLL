@@ -97,7 +97,7 @@ let parse source_text cont =
   Combinators.unwrap (program_parser (new lexer source_text))
     (fun program -> cont (resolve_gcalls program))
     (fun reason ->
-      printf "Parser error:\n%s\n" (Reason.toString (`First 5) `Acc reason))
+      printf "Parser error:\n%s\n" (Reason.toString (`First 3) `Desc reason))
 
 let example =
     "add(Z, x) = x\n"
@@ -112,7 +112,7 @@ let verbose_test () =
     (fun program ->
       printf "Parsed program:\n%s\n" (string_of_program string_of_pure program))
     (fun reason ->
-      printf "Parser error:\n%s\n" (Reason.toString (`First 3) `Acc reason))
+      printf "Parser error:\n%s\n" (Reason.toString (`First 3) `Desc reason))
 
 let big_test () =
   Combinators.unwrap (program_parser (new lexer big_example))
