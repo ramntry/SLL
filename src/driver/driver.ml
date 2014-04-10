@@ -13,7 +13,8 @@ let c_compiler_command head_form_def =
 
 let compile fname call_by_name fast_head_form =
   let head_form_def = if call_by_name then
-    "-DHEAD_FORM=" ^ if fast_head_form then "fast_head_form" else "head_form"
+    "-DSLL_HEAD_FORM="
+      ^ (if fast_head_form then "sll_fast_head_form" else "sll_head_form")
     else ""
   in
   let gen program =

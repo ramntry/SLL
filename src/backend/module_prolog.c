@@ -5,7 +5,7 @@
 #define ARG(n) \
       , Object const _##n
 #define BEGIN(n) ) { \
-    Word *const cell = new_cell(n); \
+    Word *const cell = sll_new_cell(n); \
     cell[0] = SLL_make_header((Word)ctr_id, n);
 #define INIT(n) \
     cell[n] = (Word)_##n;
@@ -79,7 +79,7 @@ static Object apply_thunk_4(Object const thunk) {
 }
 
 static inline Object create_thunk_0(Function0 const func) {
-  Word *const cell = new_cell(2);
+  Word *const cell = sll_new_cell(2);
   cell[0] = SLL_make_header((Word)SllThunkId, 0);
   cell[1] = (Word)func;
   cell[2] = (Word)&apply_thunk_0;
@@ -87,7 +87,7 @@ static inline Object create_thunk_0(Function0 const func) {
 }
 
 static inline Object create_thunk_1(Function1 const func, Object const _1) {
-  Word *const cell = new_cell(3);
+  Word *const cell = sll_new_cell(3);
   cell[0] = SLL_make_header((Word)SllThunkId, 1);
   cell[1] = (Word)_1;
   cell[2] = (Word)func;
@@ -96,7 +96,7 @@ static inline Object create_thunk_1(Function1 const func, Object const _1) {
 }
 
 static inline Object create_thunk_2(Function2 const func, Object const _1, Object const _2) {
-  Word *const cell = new_cell(4);
+  Word *const cell = sll_new_cell(4);
   cell[0] = SLL_make_header((Word)SllThunkId, 2);
   cell[1] = (Word)_1;
   cell[2] = (Word)_2;
@@ -106,7 +106,7 @@ static inline Object create_thunk_2(Function2 const func, Object const _1, Objec
 }
 
 static inline Object create_thunk_3(Function3 const func, Object const _1, Object const _2, Object const _3) {
-  Word *const cell = new_cell(5);
+  Word *const cell = sll_new_cell(5);
   cell[0] = SLL_make_header((Word)SllThunkId, 3);
   cell[1] = (Word)_1;
   cell[2] = (Word)_2;
@@ -117,7 +117,7 @@ static inline Object create_thunk_3(Function3 const func, Object const _1, Objec
 }
 
 static inline Object create_thunk_4(Function4 const func, Object const _1, Object const _2, Object const _3, Object const _4) {
-  Word *const cell = new_cell(6);
+  Word *const cell = sll_new_cell(6);
   cell[0] = SLL_make_header((Word)SllThunkId, 4);
   cell[1] = (Word)_1;
   cell[2] = (Word)_2;

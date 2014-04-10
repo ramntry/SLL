@@ -6,8 +6,8 @@
 
 #define SLL_MAX_OBJECT_SIZE 15
 
-#ifndef HEAD_FORM
-#define HEAD_FORM(obj) obj
+#ifndef SLL_HEAD_FORM
+#define SLL_HEAD_FORM(obj) obj
 #endif
 
 enum BuiltinCtrIds {
@@ -50,7 +50,7 @@ Object sll_read_value(char const *vname, char const *const *ctr_names, size_t nu
 void sll_initialize();
 void sll_finalize();
 
-static inline Word *new_cell(size_t const object_size) {
+static inline Word *sll_new_cell(size_t const object_size) {
   Word *const cell = sll_free_cell[object_size];
   if (cell) {
     sll_free_cell[object_size] = (Word *)cell[0];
@@ -61,7 +61,7 @@ static inline Word *new_cell(size_t const object_size) {
 
 typedef Object (*Applicator)(Object const obj);
 
-static inline Object head_form(Object const obj) {
+static inline Object sll_head_form(Object const obj) {
   struct {
     struct RootsBlock header;
     Object obj;
@@ -73,7 +73,7 @@ static inline Object head_form(Object const obj) {
   return m.obj;
 }
 
-static inline Object fast_head_form(Object const obj) {
+static inline Object sll_fast_head_form(Object const obj) {
   switch (SLL_get_ctr_id(obj[0])) {
     case SllThunkId: {
       struct {
@@ -82,7 +82,7 @@ static inline Object fast_head_form(Object const obj) {
       } m = { { sll_roots, 1 } };
       sll_roots = &m.header;
       m.head_form = ((Applicator)obj[SLL_get_osize(obj[0]) + 2])(obj);
-      m.head_form = fast_head_form(m.head_form);
+      m.head_form = sll_fast_head_form(m.head_form);
       obj[0] = SLL_make_header(SllCachedThunkId, 1);
       obj[1] = (Word)m.head_form;
       sll_roots = m.header.next;

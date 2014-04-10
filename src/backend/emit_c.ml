@@ -186,7 +186,7 @@ let emit_gdef ~strict gname gpdefs =
   in
   Buffer.add_string header (emit_gdecl gname gpdefs ^ " {\n");
   if not strict then
-    Buffer.add_string buf ("  " ^ ctr ^ " = HEAD_FORM(ctr);\n");
+    Buffer.add_string buf ("  " ^ ctr ^ " = SLL_HEAD_FORM(ctr);\n");
   Buffer.add_string buf ("  Object result = NULL;\n"
     ^ "  switch (SLL_get_ctr_id(" ^ ctr ^ "[0])) {\n"
     ^ "    ");

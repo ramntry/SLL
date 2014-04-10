@@ -173,7 +173,7 @@ void sll_print_value(Object const value, char const *const *ctr_names) {
     Object value;
   } m = { { sll_roots, 1 }, value };
   sll_roots = &m.header;
-  m.value = HEAD_FORM(m.value);
+  m.value = SLL_HEAD_FORM(m.value);
   CtrId const ctr_id = SLL_get_ctr_id(m.value[0]);
   size_t const size = SLL_get_osize(m.value[0]);
   if (ctr_id == SllExternalCtrId)
@@ -267,7 +267,7 @@ static Object parse_value(char const *const *ctr_names, size_t numof_ctrs, int s
     }
     lex_take(')');
   }
-  Word *const cell = new_cell(numof_args + (ctr_id == SllExternalCtrId));
+  Word *const cell = sll_new_cell(numof_args + (ctr_id == SllExternalCtrId));
   cell[0] = SLL_make_header((Word)ctr_id, numof_args);
   for (size_t i = 0; i < numof_args; ++i)
     cell[i + 1] = (Word)m.args[i];
