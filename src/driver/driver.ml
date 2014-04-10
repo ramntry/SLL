@@ -8,59 +8,59 @@ let evalstrat = ref Byneed
 let keep_c = ref false
 let only_c = ref false
 let no_opt = ref false
+let no_link = ref false
 let src_filename = ref ""
 let bin_filename = ref ""
-let object_only = ref false
 let with_dbg_info = ref false
 
 let command_line_args = [
   ("-strict", Arg.Unit (fun () -> evalstrat := Strict),
-     " use strict evaluation strategy (call-by-value semantics)",
+     " Use strict evaluation strategy (call-by-value semantics)",
      `DefaultAlt (!evalstrat = Strict));
 
   ("-byname", Arg.Unit (fun () -> evalstrat := Byname),
-     " use call-by-name semantics (usually produce very slow binary)",
+     " Use call-by-name semantics (usually produce very slow binary)",
      `DefaultAlt (!evalstrat = Byname));
 
   ("-byneed", Arg.Unit (fun () -> evalstrat := Byneed),
-     " use call-by-need semantics (lazy evaluation strategy)",
+     " Use call-by-need semantics (lazy evaluation strategy)",
      `DefaultAlt (!evalstrat = Byneed));
 
   ("-o", Arg.Set_string bin_filename,
-     "<file> output binary file name",
+     "<file> Output binary file name",
      `DefaultVal "<derived from source file name>");
 
   ("-keep-c", Arg.Set keep_c,
-     " keep generated C source file",
+     " Keep generated C source file",
      `DefaultOpt !keep_c);
 
   ("-only-c", Arg.Set only_c,
-     " only generate C source file",
+     " Only generate C source file",
      `DefaultOpt !only_c);
 
-  ("-c", Arg.Set object_only,
-     " only compile generated C source file, don't link",
-     `DefaultOpt !object_only);
+  ("-c", Arg.Set no_link,
+     " Only compile generated C source file, don't link",
+     `DefaultOpt !no_link);
 
   ("-no-opt", Arg.Set no_opt,
-     " compile without optimization (faster compilation, slower binary)",
+     " Compile without optimization (faster compilation, slower binary)",
      `DefaultOpt !no_opt);
 
   ("-g", Arg.Set with_dbg_info,
-     " compile with debug information",
+     " Compile with debug information",
      `DefaultOpt !with_dbg_info);
 
   ("-cc", Arg.Set_string c_compiler,
-     "<C-compiler> use specified " ^ !c_compiler ^ " compatible C compiler",
+     "<C-compiler> Use specified " ^ !c_compiler ^ " compatible C compiler",
      `DefaultVal !c_compiler);
 
   ("-cc-args", Arg.Set_string trailing_c_compiler_args,
-     "<C-compiler-args> append some C compiler arguments \
+     "<C-compiler-args> Append some C compiler arguments \
      (for many, use quotation marks)",
      `DefaultVal ("\"" ^ !trailing_c_compiler_args ^ "\""));
 
   ("-cc-over", Arg.Set_string c_compiler_args,
-     "<C-compiler-args> override not mentioned above C compiler arguments",
+     "<C-compiler-args> Override not mentioned above C compiler arguments",
      `DefaultVal ("\"" ^ !c_compiler_args ^ "\""));
 ]
 
@@ -123,7 +123,7 @@ let c_compiler_command c_src =
     ^ " -I" ^ backend_dir
     ^ " " ^ runtime_src
     ^ " " ^ c_src
-    ^ (if !object_only then " -c" else " -o " ^ bin_path)
+    ^ (if !no_link then " -c" else " -o " ^ bin_path)
     ^ " " ^ !trailing_c_compiler_args
 
 let compile () =
