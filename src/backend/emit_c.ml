@@ -21,24 +21,41 @@ let mangle = function
 let emit_app name args =
   name ^ "(" ^ (String.concat ", " args) ^ ")"
 
-let emit_decl name args =
+let emit_decl ~inline name args =
+  let prefix = if inline then "static inline " else "" in
   let typed_args = List.map (fun n -> "Object const " ^ n) args in
-  "Object " ^ emit_app name typed_args
+  prefix ^ "Object " ^ emit_app name typed_args
 
-let emit_fdecl fname fargs =
-  emit_decl fname (List.map mangle fargs)
+let emit_fdecl ~inline fname fargs =
+  emit_decl ~inline fname (List.map mangle fargs)
+
+let choose_gargs gpdefs =
+  let (_, { gargs; _ }) = Ident_map.choose gpdefs in
+  gargs
 
 let canonical_gargs gpdefs =
-  let (_, { gargs; _ }) = Ident_map.choose gpdefs in
-  List.map mangle gargs
+  List.map mangle (choose_gargs gpdefs)
 
-let emit_gdecl gname gpdefs =
-  emit_decl gname ("ctr" :: canonical_gargs gpdefs)
+let emit_gdecl ~inline gname gpdefs =
+  emit_decl ~inline gname ("ctr" :: canonical_gargs gpdefs)
 
-let emit_declarations { fdefs; gdefs; term; } =
+let applicator name = (mangle name) ^ "apply"
+
+let emit_adecl aname =
+  emit_decl ~inline:false aname ["thunk"]
+
+let emit_adef name args =
+  emit_adecl (applicator name) ^ " {\n"
+  ^ "  return "
+  ^ emit_app (mangle name) (List.mapi (fun i arg ->
+      "(Object)thunk[" ^ string_of_int (i + 1) ^ "] /* " ^ arg ^ " */") args)
+  ^ ";\n}\n\n"
+
+let emit_declarations ~strict { fdefs; gdefs; term; } =
   let enum = Buffer.create 16 in
   let arr = Buffer.create 16 in
   let decls = Buffer.create 16 in
+  let adefs = Buffer.create 16 in
   Buffer.add_string enum "enum {\n";
   Buffer.add_string arr "char const *const constructor_names[] = {\n";
   let module S = Set.Make(String) in
@@ -55,12 +72,19 @@ let emit_declarations { fdefs; gdefs; term; } =
   in
   let cnames_of_fdefs =
     Ident_map.fold (fun fname { fbody; fargs } a ->
-      Buffer.add_string decls (emit_fdecl (mangle fname) fargs ^ ";\n");
+      if not strict then
+        Buffer.add_string adefs (emit_adef fname fargs);
+      Buffer.add_string decls
+        (emit_fdecl ~inline:(not strict) (mangle fname) fargs ^ ";\n");
       S.union a (cnames_of_expr fbody)) fdefs S.empty
   in
   let cnames_of_defs =
     Ident_map.fold (fun gname gpdefs a ->
-      Buffer.add_string decls (emit_gdecl (mangle gname) gpdefs ^ ";\n");
+      if not strict then
+        Buffer.add_string adefs
+          (emit_adef gname ("ctr" :: choose_gargs gpdefs));
+      Buffer.add_string decls
+        (emit_gdecl ~inline:(not strict) (mangle gname) gpdefs ^ ";\n");
       S.union a (Ident_map.fold (fun pname { gbody; _ } b ->
         S.union (S.add pname b) (cnames_of_expr gbody)) gpdefs S.empty))
       gdefs cnames_of_fdefs
@@ -76,6 +100,7 @@ let emit_declarations { fdefs; gdefs; term; } =
   Buffer.add_buffer enum arr;
   Buffer.add_buffer enum decls;
   Buffer.add_string enum "\n";
+  Buffer.add_buffer enum adefs;
   Buffer.contents enum
 
 module Names = struct
@@ -139,7 +164,7 @@ let rec emit_expr ~strict indent buf env = function
       let args = List.map (fun e -> emit_expr ~strict indent buf env e) exprs in
       let (aname, args) = if strict
         then (mangle fname, args)
-        else ("create_thunk_" ^ numof_args, ("&" ^ mangle fname) :: args)
+        else ("create_thunk_" ^ numof_args, ("&" ^ applicator fname) :: args)
       in
       let val_def = emit_val_def indent vname aname args in
       Buffer.add_string buf val_def;
@@ -153,7 +178,7 @@ let rec emit_expr ~strict indent buf env = function
       in
       let (aname, args) = if strict
         then (mangle gname, args)
-        else ("create_thunk_" ^ numof_args, ("&" ^ mangle gname) :: args)
+        else ("create_thunk_" ^ numof_args, ("&" ^ applicator gname) :: args)
       in
       let val_def = emit_val_def indent vname aname args in
       Buffer.add_string buf val_def;
@@ -163,7 +188,8 @@ let emit_fdef ~strict fname { fargs; fbody; } =
   Names.reset ();
   let buf = Buffer.create 16 in
   let header = Buffer.create 16 in
-  Buffer.add_string header (emit_fdecl fname fargs ^ " {\n");
+  Buffer.add_string header
+    (emit_fdecl ~inline:(not strict) fname fargs ^ " {\n");
   let env = List.combine fargs (List.map mangle fargs) in
   let result = emit_expr ~strict 2 buf env fbody in
   Buffer.add_string buf ("  sll_roots = m.header.next;\n"
@@ -179,8 +205,9 @@ let emit_gdef ~strict gname gpdefs =
   let canonical_args = canonical_gargs gpdefs in
   let ctr = if strict then "ctr" else Names.ctr "" in
   let emit_case pname pargs gargs gbody =
-    let penv = List.mapi (fun i arg ->
-      (arg, "(Object)" ^ ctr ^ "[" ^ string_of_int (i + 1) ^ "]")) pargs
+    let penv = List.mapi (fun i arg -> (arg,
+      "(Object)" ^ ctr ^ "[" ^ string_of_int (i + 1) ^ "] /* " ^ arg ^ " */"))
+      pargs
     in
     let genv = List.combine gargs canonical_args in
     Buffer.add_string buf ("case " ^ mangle pname ^ ": {\n");
@@ -189,7 +216,8 @@ let emit_gdef ~strict gname gpdefs =
       ^ "      break;\n"
       ^ "  } ")
   in
-  Buffer.add_string header (emit_gdecl gname gpdefs ^ " {\n");
+  Buffer.add_string header
+    (emit_gdecl ~inline:(not strict) gname gpdefs ^ " {\n");
   if not strict then
     Buffer.add_string buf ("  " ^ ctr ^ " = SLL_HEAD_FORM(ctr);\n");
   Buffer.add_string buf ("  Object result = NULL;\n"
@@ -244,7 +272,7 @@ let emit ~evalstrat ({ fdefs; gdefs; term; } as p) =
   List.iter (fun emitter ->
     Buffer.add_string buffer (emitter p))
     [ emit_prolog;
-      emit_declarations;
+      emit_declarations ~strict;
       emit_gdefs ~strict;
       emit_fdefs ~strict;
       emit_main ~strict;

@@ -1,6 +1,6 @@
 CAMLC = ocamlopt.opt
 CC = gcc
-CFLAGS = -std=c99 -pedantic -Wall -O2 -DSLL_STRICT
+CFLAGS = -std=c99 -pedantic -Wall -O2 -DSLL_BYNEED
 
 INCLUDE = \
 	-I ../sll

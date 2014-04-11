@@ -74,7 +74,7 @@ static inline Object sll_head_form(Object const obj) {
   } m = { { sll_roots, 1 }, obj };
   sll_roots = &m.header;
   while (SLL_get_ctr_id(m.obj[0]) == SllThunkId)
-    m.obj = ((Applicator)m.obj[SLL_get_osize(m.obj[0]) + 2])(m.obj);
+    m.obj = ((Applicator)m.obj[SLL_get_osize(m.obj[0]) + 1])(m.obj);
   sll_roots = m.header.next;
   return m.obj;
 }
@@ -87,7 +87,7 @@ static inline Object sll_fast_head_form(Object const obj) {
         Object head_form;
       } m = { { sll_roots, 1 } };
       sll_roots = &m.header;
-      m.head_form = ((Applicator)obj[SLL_get_osize(obj[0]) + 2])(obj);
+      m.head_form = ((Applicator)obj[SLL_get_osize(obj[0]) + 1])(obj);
       m.head_form = sll_fast_head_form(m.head_form);
       obj[0] = SLL_make_header(SllCachedThunkId, 1);
       obj[1] = (Word)m.head_form;
